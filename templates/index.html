@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MLB Player Tracker</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e0e0e0; min-height: 100vh; }
+
+  header { background: #1a1f2e; border-bottom: 2px solid #c8102e; padding: 16px 24px; display: flex; align-items: center; gap: 16px; }
+  header h1 { font-size: 1.4rem; font-weight: 700; color: #fff; letter-spacing: 0.5px; }
+  header span { font-size: 1.6rem; }
+
+  .layout { display: flex; height: calc(100vh - 61px); }
+
+  /* Sidebar */
+  .sidebar { width: 280px; background: #141820; border-right: 1px solid #2a2f3e; display: flex; flex-direction: column; flex-shrink: 0; }
+  .sidebar-header { padding: 16px; border-bottom: 1px solid #2a2f3e; }
+  .search-wrap { position: relative; }
+  .search-wrap input { width: 100%; padding: 9px 12px; background: #1e2435; border: 1px solid #3a3f4e; border-radius: 8px; color: #e0e0e0; font-size: 0.9rem; outline: none; }
+  .search-wrap input:focus { border-color: #c8102e; }
+  .search-results { position: absolute; top: 100%; left: 0; right: 0; background: #1e2435; border: 1px solid #3a3f4e; border-radius: 8px; margin-top: 4px; z-index: 100; max-height: 300px; overflow-y: auto; }
+  .search-result { padding: 10px 12px; cursor: pointer; border-bottom: 1px solid #2a2f3e; display: flex; justify-content: space-between; align-items: center; }
+  .search-result:last-child { border-bottom: none; }
+  .search-result:hover { background: #2a2f3e; }
+  .search-result .player-name { font-size: 0.88rem; font-weight: 600; }
+  .search-result .player-meta { font-size: 0.75rem; color: #888; }
+  .search-result .add-btn { background: #c8102e; color: #fff; border: none; border-radius: 5px; padding: 3px 8px; font-size: 0.75rem; cursor: pointer; }
+  .search-result .add-btn:hover { background: #e01535; }
+
+  .tracked-list { flex: 1; overflow-y: auto; padding: 8px; }
+  .tracked-list h3 { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: #666; padding: 8px 4px 6px; }
+  .player-card { padding: 10px 12px; border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; border: 1px solid transparent; transition: all 0.15s; }
+  .player-card:hover { background: #1e2435; }
+  .player-card.active { background: #1e2435; border-color: #c8102e; }
+  .player-card .info .name { font-size: 0.88rem; font-weight: 600; color: #e0e0e0; }
+  .player-card .info .meta { font-size: 0.75rem; color: #888; margin-top: 2px; }
+  .remove-btn { background: none; border: none; color: #555; cursor: pointer; font-size: 1rem; padding: 2px 6px; border-radius: 4px; }
+  .remove-btn:hover { color: #c8102e; background: #2a2f3e; }
+
+  .sidebar-footer { padding: 12px 16px; border-top: 1px solid #2a2f3e; }
+  .sport-toggle { display: flex; gap: 6px; margin-bottom: 10px; }
+  .sport-btn { flex: 1; padding: 7px; border: 1px solid #3a3f4e; border-radius: 6px; background: none; color: #888; font-size: 0.8rem; cursor: pointer; transition: all 0.15s; }
+  .sport-btn.active { background: #c8102e; border-color: #c8102e; color: #fff; font-weight: 600; }
+  .refresh-btn { width: 100%; padding: 8px; background: #1e2435; border: 1px solid #3a3f4e; border-radius: 6px; color: #aaa; font-size: 0.82rem; cursor: pointer; }
+  .refresh-btn:hover { border-color: #c8102e; color: #fff; }
+
+  /* Main */
+  .main { flex: 1; overflow-y: auto; padding: 24px; }
+  .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #444; gap: 12px; }
+  .empty-state .icon { font-size: 3rem; }
+  .empty-state p { font-size: 1rem; }
+
+  .player-header { margin-bottom: 20px; }
+  .player-header h2 { font-size: 1.6rem; font-weight: 700; }
+  .player-header .subtitle { color: #888; font-size: 0.9rem; margin-top: 4px; }
+
+  .tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid #2a2f3e; }
+  .tab { padding: 8px 16px; border: none; background: none; color: #888; font-size: 0.9rem; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tab.active { color: #fff; border-bottom-color: #c8102e; font-weight: 600; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  thead tr { background: #1a1f2e; }
+  th { padding: 10px 12px; text-align: left; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.8px; color: #888; font-weight: 600; border-bottom: 1px solid #2a2f3e; white-space: nowrap; }
+  td { padding: 10px 12px; border-bottom: 1px solid #1e2435; white-space: nowrap; }
+  tbody tr:hover { background: #1a1f2e; }
+  tbody tr:last-child td { border-bottom: none; }
+  .good { color: #4caf7d; font-weight: 600; }
+  .highlight { color: #f0c040; font-weight: 600; }
+  .decision { font-weight: 700; }
+  .decision.W { color: #4caf7d; }
+  .decision.L { color: #c8102e; }
+  .decision.SV { color: #f0c040; }
+  .decision.HLD { color: #7ec8e3; }
+
+  .no-games { color: #555; text-align: center; padding: 40px; font-size: 0.9rem; }
+  .loading { color: #555; text-align: center; padding: 40px; }
+  .sport-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; margin-left: 10px; vertical-align: middle; }
+  .sport-badge.spring { background: #f0c04022; color: #f0c040; border: 1px solid #f0c04055; }
+  .sport-badge.mlb { background: #c8102e22; color: #c8102e; border: 1px solid #c8102e55; }
+</style>
+</head>
+<body>
+
+<header>
+  <span>⚾</span>
+  <h1>MLB Player Tracker</h1>
+</header>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="search-wrap">
+        <input type="text" id="searchInput" placeholder="Search players..." autocomplete="off">
+        <div class="search-results" id="searchResults" style="display:none"></div>
+      </div>
+    </div>
+
+    <div class="tracked-list">
+      <h3>Tracked Players</h3>
+      <div id="playerList"></div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="sport-toggle">
+        <button class="sport-btn active" id="btnSpring" onclick="setSport('S')">🌵 Spring</button>
+        <button class="sport-btn" id="btnMLB" onclick="setSport('R')">⚾ MLB</button>
+      </div>
+      <button class="refresh-btn" onclick="refreshData()">↻ Refresh Data</button>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main" id="main">
+    <div class="empty-state">
+      <div class="icon">⚾</div>
+      <p>Search for a player to start tracking</p>
+    </div>
+  </div>
+</div>
+
+<script>
+let trackedPlayers = [];
+let activePlayerId = null;
+let currentSport = 'S'; // S=Spring Training, R=Regular Season
+let searchTimeout = null;
+
+// Init
+loadTracked();
+
+function setSport(sportId) {
+  currentSport = sportId;
+  document.getElementById('btnSpring').classList.toggle('active', sportId === 'S');
+  document.getElementById('btnMLB').classList.toggle('active', sportId === 'R');
+  if (activePlayerId) showStats(activePlayerId);
+}
+
+async function loadTracked() {
+  const res = await fetch('/api/tracked');
+  trackedPlayers = await res.json();
+  renderPlayerList();
+}
+
+function renderPlayerList() {
+  const el = document.getElementById('playerList');
+  if (!trackedPlayers.length) {
+    el.innerHTML = '<div style="color:#555;font-size:0.82rem;padding:8px 4px">No players tracked yet</div>';
+    return;
+  }
+  el.innerHTML = trackedPlayers.map(p => `
+    <div class="player-card ${p.id === activePlayerId ? 'active' : ''}" onclick="showStats(${p.id})">
+      <div class="info">
+        <div class="name">${p.fullName}</div>
+        <div class="meta">${p.position} · ${p.currentTeam || ''}</div>
+      </div>
+      <button class="remove-btn" onclick="event.stopPropagation(); removePlayer(${p.id})">✕</button>
+    </div>
+  `).join('');
+}
+
+// Search
+document.getElementById('searchInput').addEventListener('input', function() {
+  clearTimeout(searchTimeout);
+  const q = this.value.trim();
+  if (q.length < 2) { document.getElementById('searchResults').style.display = 'none'; return; }
+  searchTimeout = setTimeout(() => doSearch(q), 300);
+});
+
+document.getElementById('searchInput').addEventListener('blur', function() {
+  setTimeout(() => { document.getElementById('searchResults').style.display = 'none'; }, 200);
+});
+
+async function doSearch(q) {
+  const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+  const results = await res.json();
+  const el = document.getElementById('searchResults');
+  if (!results.length) { el.style.display = 'none'; return; }
+  el.innerHTML = results.map(p => `
+    <div class="search-result">
+      <div>
+        <div class="player-name">${p.fullName}</div>
+        <div class="player-meta">${p.position} · ${p.currentTeam}</div>
+      </div>
+      <button class="add-btn" onclick="addPlayer(${JSON.stringify(p).replace(/"/g, '&quot;')})">+ Add</button>
+    </div>
+  `).join('');
+  el.style.display = 'block';
+}
+
+async function addPlayer(p) {
+  await fetch('/api/track', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(p) });
+  document.getElementById('searchInput').value = '';
+  document.getElementById('searchResults').style.display = 'none';
+  await loadTracked();
+  showStats(p.id);
+}
+
+async function removePlayer(id) {
+  await fetch(`/api/track/${id}`, { method: 'DELETE' });
+  if (activePlayerId === id) {
+    activePlayerId = null;
+    document.getElementById('main').innerHTML = '<div class="empty-state"><div class="icon">⚾</div><p>Select a player to view stats</p></div>';
+  }
+  await loadTracked();
+}
+
+async function showStats(playerId) {
+  activePlayerId = playerId;
+  renderPlayerList();
+  const player = trackedPlayers.find(p => p.id === playerId);
+  const sportLabel = currentSport === 'S' ? 'Spring Training' : 'MLB';
+  const sportClass = currentSport === 'S' ? 'spring' : 'mlb';
+
+  document.getElementById('main').innerHTML = `
+    <div class="player-header">
+      <h2>${player ? player.fullName : 'Player'} <span class="sport-badge ${sportClass}">${sportLabel}</span></h2>
+      <div class="subtitle">${player ? player.position + ' · ' + (player.currentTeam || '') : ''}</div>
+    </div>
+    <div class="loading">Loading stats...</div>
+  `;
+
+  const res = await fetch(`/api/stats/${playerId}?sport=${currentSport}`);
+  const data = await res.json();
+
+  const hasHitting = data.hitting && data.hitting.length > 0;
+  const hasPitching = data.pitching && data.pitching.length > 0;
+
+  let tabs = '';
+  let content = '';
+
+  if (!hasHitting && !hasPitching) {
+    content = `<div class="no-games">No games found for ${sportLabel} 2026</div>`;
+  } else {
+    const showTabs = hasHitting && hasPitching;
+    if (showTabs) {
+      tabs = `
+        <div class="tabs">
+          <button class="tab active" id="tabHit" onclick="switchTab('hitting')">🏏 Hitting</button>
+          <button class="tab" id="tabPitch" onclick="switchTab('pitching')">⚾ Pitching</button>
+        </div>
+      `;
+    }
+    if (hasHitting) content += `<div id="hittingTable">${buildHittingTable(data.hitting)}</div>`;
+    if (hasPitching) content += `<div id="pitchingTable" ${showTabs ? 'style="display:none"' : ''}>${buildPitchingTable(data.pitching)}</div>`;
+  }
+
+  document.getElementById('main').innerHTML = `
+    <div class="player-header">
+      <h2>${player ? player.fullName : 'Player'} <span class="sport-badge ${sportClass}">${sportLabel}</span></h2>
+      <div class="subtitle">${player ? player.position + ' · ' + (player.currentTeam || '') : ''}</div>
+    </div>
+    ${tabs}
+    ${content}
+  `;
+}
+
+function switchTab(tab) {
+  document.getElementById('tabHit').classList.toggle('active', tab === 'hitting');
+  document.getElementById('tabPitch').classList.toggle('active', tab === 'pitching');
+  document.getElementById('hittingTable').style.display = tab === 'hitting' ? '' : 'none';
+  document.getElementById('pitchingTable').style.display = tab === 'pitching' ? '' : 'none';
+}
+
+function buildHittingTable(games) {
+  const rows = games.map(g => `
+    <tr>
+      <td>${formatDate(g.date)}</td>
+      <td>${g.opponent}</td>
+      <td>${g.ab}</td>
+      <td class="${g.h > 0 ? 'good' : ''}">${g.h}</td>
+      <td class="${g.hr > 0 ? 'highlight' : ''}">${g.hr}</td>
+      <td class="${g.rbi > 0 ? 'good' : ''}">${g.rbi}</td>
+      <td>${g.r}</td>
+      <td class="${g.sb > 0 ? 'highlight' : ''}">${g.sb}</td>
+      <td>${g.bb}</td>
+      <td>${g.k}</td>
+      <td>${g.avg}</td>
+    </tr>
+  `).join('');
+  return `
+    <table>
+      <thead><tr><th>Date</th><th>Opp</th><th>AB</th><th>H</th><th>HR</th><th>RBI</th><th>R</th><th>SB</th><th>BB</th><th>K</th><th>AVG</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+function buildPitchingTable(games) {
+  const rows = games.map(g => `
+    <tr>
+      <td>${formatDate(g.date)}</td>
+      <td>${g.opponent}</td>
+      <td class="${parseFloat(g.ip) >= 6 ? 'good' : ''}">${g.ip}</td>
+      <td>${g.h}</td>
+      <td class="${g.er > 3 ? 'decision L' : g.er === 0 ? 'good' : ''}">${g.er}</td>
+      <td>${g.bb}</td>
+      <td class="${g.k >= 7 ? 'highlight' : ''}">${g.k}</td>
+      <td>${g.hr}</td>
+      <td class="decision ${g.decision}">${g.decision}</td>
+    </tr>
+  `).join('');
+  return `
+    <table>
+      <thead><tr><th>Date</th><th>Opp</th><th>IP</th><th>H</th><th>ER</th><th>BB</th><th>K</th><th>HR</th><th>Dec</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+function formatDate(d) {
+  if (!d) return '';
+  const [y, m, day] = d.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[parseInt(m)-1]} ${parseInt(day)}`;
+}
+
+async function refreshData() {
+  await fetch('/api/refresh', { method: 'POST' });
+  if (activePlayerId) showStats(activePlayerId);
+}
+</script>
+</body>
+</html>
