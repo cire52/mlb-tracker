@@ -8,9 +8,17 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e0e0e0; min-height: 100vh; }
 
-  header { background: #1a1f2e; border-bottom: 2px solid #c8102e; padding: 16px 24px; display: flex; align-items: center; gap: 16px; }
-  header h1 { font-size: 1.4rem; font-weight: 700; color: #fff; letter-spacing: 0.5px; }
-  header span { font-size: 1.6rem; }
+  header { background: #1a1f2e; border-bottom: 2px solid #c8102e; padding: 0 16px 0 24px; display: flex; align-items: center; gap: 12px; height: 52px; flex-shrink: 0; }
+  header h1 { font-size: 1.2rem; font-weight: 700; color: #fff; letter-spacing: 0.5px; white-space: nowrap; }
+  header span { font-size: 1.4rem; flex-shrink: 0; }
+  .header-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; flex-wrap: nowrap; }
+  .hdr-btn { padding: 5px 11px; border-radius: 6px; border: 1px solid #3a3f4e; background: #141820; color: #aaa; font-size: 0.78rem; cursor: pointer; white-space: nowrap; transition: all 0.13s; }
+  .hdr-btn:hover { border-color: #c8102e; color: #fff; }
+  .hdr-btn.active { background: #c8102e22; border-color: #c8102e55; color: #c8102e; font-weight: 600; }
+  .hdr-sport-toggle { display: flex; border: 1px solid #3a3f4e; border-radius: 6px; overflow: hidden; }
+  .hdr-sport-btn { padding: 5px 10px; border: none; background: #141820; color: #666; font-size: 0.78rem; cursor: pointer; transition: all 0.13s; white-space: nowrap; }
+  .hdr-sport-btn.active { background: #c8102e; color: #fff; font-weight: 600; }
+  .hdr-divider { width: 1px; height: 24px; background: #2a2f3e; flex-shrink: 0; }
 
   .layout { display: flex; height: calc(100vh - 61px); }
 
@@ -84,16 +92,6 @@
   .gp-save { padding: 5px 10px; background: #c8102e; border: none; border-radius: 4px; color: #fff; font-size: 0.78rem; cursor: pointer; white-space: nowrap; }
   .gp-save:hover { background: #e01535; }
 
-  /* Sidebar footer */
-  .sidebar-footer { padding: 10px 12px; border-top: 1px solid #2a2f3e; }
-  .sport-toggle { display: flex; gap: 6px; margin-bottom: 8px; }
-  .sport-btn { flex: 1; padding: 7px; border: 1px solid #3a3f4e; border-radius: 6px; background: none; color: #888; font-size: 0.8rem; cursor: pointer; transition: all 0.15s; }
-  .sport-btn.active { background: #c8102e; border-color: #c8102e; color: #fff; font-weight: 600; }
-  .refresh-btn { width: 100%; padding: 7px; background: #1e2435; border: 1px solid #3a3f4e; border-radius: 6px; color: #aaa; font-size: 0.8rem; cursor: pointer; margin-bottom: 6px; }
-  .refresh-btn:hover { border-color: #c8102e; color: #fff; }
-  .export-btn { width: 100%; padding: 7px; background: #1e2435; border: 1px solid #3a3f4e; border-radius: 6px; color: #aaa; font-size: 0.78rem; cursor: pointer; }
-  .export-btn:hover { border-color: #4caf7d; color: #4caf7d; }
-  .cache-note { font-size: 0.7rem; color: #3a3f4e; text-align: center; margin-top: 6px; }
 
   /* Import modal */
   .import-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 500; display: flex; align-items: center; justify-content: center; }
@@ -120,9 +118,6 @@
   .team-x:hover { opacity: 1 !important; color: #c8102e; }
   .team-tab-add { padding: 3px 9px; border-radius: 10px; font-size: 0.71rem; cursor: pointer; background: none; border: 1px dashed #3a3f4e; color: #444; transition: all 0.12s; white-space: nowrap; }
   .team-tab-add:hover { color: #888; border-color: #666; }
-  .hub-btn { width: 100%; padding: 7px; background: #1e2435; border: 1px solid #3a3f4e; border-radius: 6px; color: #aaa; font-size: 0.8rem; cursor: pointer; margin-bottom: 6px; }
-  .hub-btn:hover { border-color: #c8102e; color: #fff; }
-  .hub-btn.active { background: #c8102e22; border-color: #c8102e55; color: #c8102e; font-weight: 600; }
   .hub-title { font-size: 1rem; font-weight: 700; color: #e0e0e0; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #c8102e; }
   .hub-section { margin-bottom: 28px; }
   .hub-player-hdr { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; cursor: pointer; }
@@ -325,13 +320,14 @@
   .arb-badge { font-size: 0.65rem; background: #1a1f2e; border: 1px solid #2a2f3e; border-radius: 4px; padding: 1px 5px; color: #666; margin-left: 4px; vertical-align: middle; }
 
   /* ── Mobile ── */
-  .mob-menu-btn { display: none; background: none; border: none; color: #e0e0e0; font-size: 1.5rem; cursor: pointer; padding: 4px 8px; line-height: 1; margin-left: auto; }
+  .mob-menu-btn { display: none; background: none; border: none; color: #e0e0e0; font-size: 1.5rem; cursor: pointer; padding: 4px 8px; line-height: 1; }
   .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 150; }
 
   @media (max-width: 768px) {
     .mob-menu-btn { display: block; }
-    .layout { height: auto; min-height: calc(100vh - 61px); }
-    .sidebar { position: fixed; top: 61px; left: -300px; height: calc(100vh - 61px); z-index: 200; transition: left 0.22s ease; }
+    .header-actions { display: none; }
+    .layout { height: auto; min-height: calc(100vh - 52px); }
+    .sidebar { position: fixed; top: 52px; left: -300px; height: calc(100vh - 52px); z-index: 200; transition: left 0.22s ease; }
     .sidebar.open { left: 0; box-shadow: 4px 0 24px rgba(0,0,0,0.5); }
     .sidebar-overlay.open { display: block; }
     .main { padding: 14px; width: 100%; }
@@ -347,6 +343,20 @@
 <header>
   <span>⚾</span>
   <h1>mlbplayertracker</h1>
+  <div class="header-actions">
+    <button class="hdr-btn" id="hubGameBtn" onclick="showGameHub()">📋 Game Log</button>
+    <button class="hdr-btn" id="hubNewsBtn" onclick="showNewsHub()">📰 News</button>
+    <button class="hdr-btn" id="hubVideoBtn" onclick="showVideoHub()">🎬 Videos</button>
+    <div class="hdr-divider"></div>
+    <div class="hdr-sport-toggle">
+      <button class="hdr-sport-btn active" id="btnSpring" onclick="setSport('S')">🌵 Spring</button>
+      <button class="hdr-sport-btn" id="btnMLB" onclick="setSport('R')">⚾ MLB</button>
+    </div>
+    <div class="hdr-divider"></div>
+    <button class="hdr-btn" onclick="refreshData()" title="Refresh Data">↻</button>
+    <button class="hdr-btn" onclick="exportCSV()" title="Export CSV">↓ CSV</button>
+    <button class="hdr-btn" style="border-color:#4a6fa5;color:#4a6fa5" onclick="openImport()" title="Import">↑ Import</button>
+  </div>
   <button class="mob-menu-btn" onclick="toggleSidebar()">☰</button>
 </header>
 
@@ -385,21 +395,6 @@
     <div class="tracked-list">
       <h3>Tracked Players</h3>
       <div id="playerList"></div>
-    </div>
-    <div class="sidebar-footer">
-      <button class="hub-btn" id="hubGameBtn" onclick="showGameHub()">📋 Game Log Hub</button>
-      <button class="hub-btn" id="hubNewsBtn" onclick="showNewsHub()">📰 News Hub</button>
-      <button class="hub-btn" id="hubVideoBtn" onclick="showVideoHub()">🎬 Video Hub</button>
-      <div class="sport-toggle">
-        <button class="sport-btn active" id="btnSpring" onclick="setSport('S')">🌵 Spring</button>
-        <button class="sport-btn" id="btnMLB" onclick="setSport('R')">⚾ MLB</button>
-      </div>
-      <button class="refresh-btn" onclick="refreshData()">↻ Refresh Data</button>
-      <div style="display:flex;gap:6px">
-        <button class="export-btn" style="flex:1" onclick="exportCSV()">↓ Export CSV</button>
-        <button class="export-btn" style="flex:1;border-color:#4a6fa5;color:#4a6fa5" onclick="openImport()">↑ Import</button>
-      </div>
-      <div class="cache-note">Stats auto-refresh every hour</div>
     </div>
   </div>
 
