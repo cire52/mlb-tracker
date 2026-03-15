@@ -359,12 +359,22 @@
   /* ── Mobile ── */
   .mob-menu-btn { display: none; background: none; border: none; color: #e0e0e0; font-size: 1.5rem; cursor: pointer; padding: 4px 8px; line-height: 1; }
   .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 150; }
+  .mob-sidebar-footer { display: none; padding: 12px; border-top: 1px solid #2a2f3e; flex-direction: column; gap: 8px; }
+  .mob-hub-btns { display: flex; flex-direction: column; gap: 6px; }
+  .mob-footer-btn { flex: 1; padding: 9px 10px; background: #1e2435; border: 1px solid #3a3f4e; border-radius: 7px; color: #aaa; font-size: 0.82rem; cursor: pointer; text-align: center; transition: all 0.13s; }
+  .mob-footer-btn:hover, .mob-footer-btn.active { border-color: #c8102e; color: #fff; }
+  .mob-sport-row { display: flex; gap: 6px; }
+  .mob-sport-btn { flex: 1; padding: 9px; border: 1px solid #3a3f4e; border-radius: 7px; background: none; color: #888; font-size: 0.82rem; cursor: pointer; transition: all 0.13s; }
+  .mob-sport-btn.active { background: #c8102e; border-color: #c8102e; color: #fff; font-weight: 600; }
+  .mob-action-row { display: flex; gap: 6px; }
+  .mob-auth-area { padding-top: 2px; }
 
   @media (max-width: 768px) {
     .mob-menu-btn { display: block; }
     .header-actions { display: none; }
+    .mob-sidebar-footer { display: flex; }
     .layout { height: auto; min-height: calc(100vh - 52px); }
-    .sidebar { position: fixed; top: 52px; left: -300px; height: calc(100vh - 52px); z-index: 200; transition: left 0.22s ease; }
+    .sidebar { position: fixed; top: 52px; left: -300px; height: calc(100vh - 52px); z-index: 200; transition: left 0.22s ease; overflow-y: auto; }
     .sidebar.open { left: 0; box-shadow: 4px 0 24px rgba(0,0,0,0.5); }
     .sidebar-overlay.open { display: block; }
     .main { padding: 14px; width: 100%; }
@@ -440,6 +450,23 @@
       <h3>Tracked Players</h3>
       <div id="playerList"></div>
     </div>
+    <div class="mob-sidebar-footer">
+      <div class="mob-hub-btns">
+        <button class="mob-footer-btn" id="mobHubGameBtn" onclick="showGameHub()">📋 Game Log</button>
+        <button class="mob-footer-btn" id="mobHubNewsBtn" onclick="showNewsHub()">📰 News</button>
+        <button class="mob-footer-btn" id="mobHubVideoBtn" onclick="showVideoHub()">🎬 Videos</button>
+      </div>
+      <div class="mob-sport-row">
+        <button class="mob-sport-btn active" id="mobBtnSpring" onclick="setSport('S')">🌵 Spring</button>
+        <button class="mob-sport-btn" id="mobBtnMLB" onclick="setSport('R')">⚾ MLB</button>
+      </div>
+      <div class="mob-action-row">
+        <button class="mob-footer-btn" onclick="refreshData()">↻ Refresh</button>
+        <button class="mob-footer-btn" onclick="exportCSV()">↓ CSV</button>
+        <button class="mob-footer-btn" style="border-color:#4a6fa5;color:#4a6fa5" onclick="openImport()">↑ Import</button>
+      </div>
+      <div id="mobAuthArea" class="mob-auth-area"></div>
+    </div>
   </div>
 
   <div class="main" id="main"></div>
@@ -504,6 +531,8 @@ function setSport(sportId) {
   currentSport = sportId;
   document.getElementById('btnSpring').classList.toggle('active', sportId === 'S');
   document.getElementById('btnMLB').classList.toggle('active', sportId === 'R');
+  document.getElementById('mobBtnSpring').classList.toggle('active', sportId === 'S');
+  document.getElementById('mobBtnMLB').classList.toggle('active', sportId === 'R');
   if (compareIds.size >= 2) renderComparison();
   else if (currentHub === 'game') showGameHub();
   else if (activePlayerId) showStats(activePlayerId);
@@ -1774,13 +1803,19 @@ async function deleteTeam(i) {
 }
 
 /* ── Game Log Hub ── */
+function setActiveHub(hub) {
+  ['Game','News','Video'].forEach(h => {
+    const active = h.toLowerCase() === hub;
+    document.getElementById(`hub${h}Btn`)?.classList.toggle('active', active);
+    document.getElementById(`mobHub${h}Btn`)?.classList.toggle('active', active);
+  });
+}
+
 async function showGameHub() {
   currentHub = 'game';
   activePlayerId = null;
   renderPlayerList();
-  document.getElementById('hubGameBtn').classList.add('active');
-  document.getElementById('hubNewsBtn').classList.remove('active');
-  document.getElementById('hubVideoBtn').classList.remove('active');
+  setActiveHub('game');
   if (window.innerWidth <= 768) {
     document.getElementById('sidebar').classList.remove('open');
     document.getElementById('sidebarOverlay').classList.remove('open');
@@ -1837,9 +1872,7 @@ async function showNewsHub() {
   currentHub = 'news';
   activePlayerId = null;
   renderPlayerList();
-  document.getElementById('hubNewsBtn').classList.add('active');
-  document.getElementById('hubGameBtn').classList.remove('active');
-  document.getElementById('hubVideoBtn').classList.remove('active');
+  setActiveHub('news');
   if (window.innerWidth <= 768) {
     document.getElementById('sidebar').classList.remove('open');
     document.getElementById('sidebarOverlay').classList.remove('open');
@@ -1895,9 +1928,7 @@ async function showVideoHub() {
   currentHub = 'video';
   activePlayerId = null;
   renderPlayerList();
-  document.getElementById('hubVideoBtn').classList.add('active');
-  document.getElementById('hubGameBtn').classList.remove('active');
-  document.getElementById('hubNewsBtn').classList.remove('active');
+  setActiveHub('video');
   if (window.innerWidth <= 768) {
     document.getElementById('sidebar').classList.remove('open');
     document.getElementById('sidebarOverlay').classList.remove('open');
@@ -2171,16 +2202,24 @@ async function initAuth() {
 
 function renderAuthArea() {
   const el = document.getElementById('authArea');
-  if (!el) return;
+  const mobEl = document.getElementById('mobAuthArea');
   if (currentUser) {
     const initial = currentUser.username[0].toUpperCase();
-    el.innerHTML = `<div class="auth-user">
+    const desktopHtml = `<div class="auth-user">
       <div class="auth-avatar">${initial}</div>
       <span class="auth-username">${esc(currentUser.username)}</span>
       <button class="hdr-btn" onclick="logOut()" style="padding:4px 9px;font-size:0.72rem">Sign Out</button>
     </div>`;
+    const mobileHtml = `<div style="display:flex;align-items:center;gap:8px;padding:4px 0">
+      <div class="auth-avatar">${initial}</div>
+      <span style="font-size:0.85rem;color:#ccc;font-weight:600">${esc(currentUser.username)}</span>
+      <button class="mob-footer-btn" style="flex:none;padding:6px 12px" onclick="logOut()">Sign Out</button>
+    </div>`;
+    if (el) el.innerHTML = desktopHtml;
+    if (mobEl) mobEl.innerHTML = mobileHtml;
   } else {
-    el.innerHTML = `<button class="hdr-btn" style="border-color:#c8102e;color:#c8102e;font-weight:700" onclick="openAuth()">Sign In</button>`;
+    if (el) el.innerHTML = `<button class="hdr-btn" style="border-color:#c8102e;color:#c8102e;font-weight:700" onclick="openAuth()">Sign In</button>`;
+    if (mobEl) mobEl.innerHTML = `<button class="mob-footer-btn" style="width:100%;border-color:#c8102e;color:#c8102e;font-weight:700" onclick="openAuth()">Sign In / Create Account</button>`;
   }
 }
 
