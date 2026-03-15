@@ -375,7 +375,7 @@
     .header-actions { display: none; }
     .mob-sidebar-footer { display: flex; }
     .layout { height: auto; min-height: calc(100vh - 52px); }
-    .sidebar { position: fixed; top: 52px; left: -300px; height: calc(100vh - 52px); z-index: 200; transition: left 0.22s ease; overflow-y: auto; flex-direction: column; }
+    .sidebar { position: fixed; top: 52px; left: -300px; height: calc(100dvh - 52px); z-index: 200; transition: left 0.22s ease; overflow-y: auto; overflow-x: hidden; flex-direction: column; -webkit-overflow-scrolling: touch; padding-bottom: env(safe-area-inset-bottom, 16px); }
     .tracked-list { flex: none; overflow-y: visible; }
     .sidebar.open { left: 0; box-shadow: 4px 0 24px rgba(0,0,0,0.5); }
     .sidebar-overlay.open { display: block; }
