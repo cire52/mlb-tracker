@@ -1767,8 +1767,8 @@ async function showGameHub() {
     if (!hasHitting && !hasPitching) {
       html += `<div class="hub-no-games">No games found for ${sportLabel} 2026</div>`;
     } else {
-      if (hasHitting) html += `<div style="overflow-x:auto">${buildHittingTable(data.hitting)}</div>`;
-      if (hasPitching) html += `<div style="overflow-x:auto">${buildPitchingTable(data.pitching)}</div>`;
+      if (hasHitting) html += `<div style="overflow-x:auto">${buildHittingTable(data.hitting.slice(0, 5))}</div>`;
+      if (hasPitching) html += `<div style="overflow-x:auto">${buildPitchingTable(data.pitching.slice(0, 5))}</div>`;
     }
     html += '</div>';
   }
