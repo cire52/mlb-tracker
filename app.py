@@ -134,6 +134,26 @@ def auth_me():
     return jsonify({"username": username, "uid": user["uid"], "email": user.get("email", "")})
 
 
+@app.route("/api/admin/reset-password", methods=["POST"])
+def admin_reset_password():
+    admin_key = os.environ.get("ADMIN_KEY")
+    if not admin_key or request.json.get("admin_key") != admin_key:
+        return jsonify({"error": "Unauthorized"}), 401
+    username = (request.json.get("username") or "").strip().lower()
+    new_password = request.json.get("password", "")
+    if not username or len(new_password) < 6:
+        return jsonify({"error": "Username and password (min 6 chars) required"}), 400
+    with _users_lock:
+        users = load_users()
+        if username not in users:
+            return jsonify({"error": f"User '{username}' not found"}), 404
+        users[username]["password_hash"] = generate_password_hash(new_password)
+        users[username].pop("reset_token", None)
+        users[username].pop("reset_expires", None)
+        save_users(users)
+    return jsonify({"ok": True, "message": f"Password for '{username}' has been reset"})
+
+
 @app.route("/api/auth/forgot", methods=["POST"])
 def auth_forgot():
     email = (request.json or {}).get("email", "").strip().lower()
