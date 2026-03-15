@@ -483,7 +483,7 @@ function landingHtml() {
     <div class="landing-sub">Your personal MLB scouting hub. Track players, compare Statcast profiles, and stay on top of your fantasy roster.</div>
     <div class="landing-features">
       <div class="landing-feature" onclick="showGameHub()"><div class="feat-icon">📋</div><div class="feat-label">Game Logs</div></div>
-      <div class="landing-feature" onclick="showGameHub()"><div class="feat-icon">📡</div><div class="feat-label">Statcast Data</div></div>
+      <div class="landing-feature" onclick="showStatcastDb()"><div class="feat-icon">📡</div><div class="feat-label">Statcast Data</div></div>
       <div class="landing-feature" onclick="showNewsHub()"><div class="feat-icon">📰</div><div class="feat-label">Player News</div></div>
       <div class="landing-feature" onclick="showVideoHub()"><div class="feat-icon">🎬</div><div class="feat-label">Highlights</div></div>
     </div>
@@ -2004,6 +2004,98 @@ function openHubVideo(idx) {
   document.body.appendChild(overlay);
 }
 
+/* ── Statcast Database ── */
+function showStatcastDb() {
+  currentHub = 'statcast';
+  activePlayerId = null;
+  const main = document.getElementById('main');
+  main.innerHTML = `
+    <div style="max-width:680px;margin:0 auto;padding:8px 0">
+      <h2 style="font-size:1.15rem;font-weight:800;color:#e0e0e0;margin-bottom:14px">📡 Statcast Database</h2>
+      <div style="display:flex;gap:8px;margin-bottom:6px">
+        <input id="scDbInput" type="text" placeholder="Search any MLB player…" autocomplete="off"
+          style="flex:1;padding:10px 14px;background:#1a1f2e;border:1px solid #3a3f4e;border-radius:8px;color:#e0e0e0;font-size:0.95rem;outline:none"
+          oninput="scDbAutocomplete(this.value)"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();scDbSearch()}"
+        >
+        <button onclick="scDbSearch()" style="padding:10px 18px;background:#c8102e;border:none;border-radius:8px;color:#fff;font-weight:700;cursor:pointer;font-size:0.9rem">Search</button>
+      </div>
+      <div id="scDbSuggestions" style="background:#1a1f2e;border:1px solid #3a3f4e;border-radius:8px;margin-bottom:8px;display:none;overflow:hidden"></div>
+      <div style="display:flex;gap:8px;margin-bottom:16px">
+        <select id="scDbYear" style="padding:7px 10px;background:#1a1f2e;border:1px solid #3a3f4e;border-radius:7px;color:#aaa;font-size:0.85rem">
+          <option value="2026">2026</option>
+          <option value="2025" selected>2025</option>
+          <option value="2024">2024</option>
+          <option value="2023">2023</option>
+        </select>
+      </div>
+      <div id="scDbResult"></div>
+    </div>`;
+}
+
+let _scDbSuggestions = [];
+async function scDbAutocomplete(q) {
+  const box = document.getElementById('scDbSuggestions');
+  if (!q || q.length < 2) { box.style.display = 'none'; return; }
+  try {
+    const r = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+    _scDbSuggestions = await r.json();
+    if (!_scDbSuggestions.length) { box.style.display = 'none'; return; }
+    box.innerHTML = _scDbSuggestions.slice(0, 8).map((p, i) =>
+      `<div onclick="scDbSelectPlayer(${i})" style="display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;border-bottom:1px solid #2a2f3e;transition:background 0.1s" onmouseover="this.style.background='#252b3b'" onmouseout="this.style.background=''">
+        <img src="${esc(p.headshotUrl||GENERIC_HEADSHOT)}" onerror="this.src='${GENERIC_HEADSHOT}'" style="width:30px;height:30px;border-radius:50%;object-fit:cover">
+        <div>
+          <div style="font-size:0.88rem;color:#e0e0e0;font-weight:600">${esc(p.fullName)}</div>
+          <div style="font-size:0.75rem;color:#666">${esc(p.position||'')} · ${esc(p.currentTeam||'')}</div>
+        </div>
+      </div>`
+    ).join('');
+    box.style.display = 'block';
+  } catch(e) {}
+}
+
+function scDbSelectPlayer(idx) {
+  const p = _scDbSuggestions[idx];
+  if (!p) return;
+  document.getElementById('scDbInput').value = p.fullName;
+  document.getElementById('scDbSuggestions').style.display = 'none';
+  scDbLoadPlayer(p);
+}
+
+async function scDbSearch() {
+  document.getElementById('scDbSuggestions').style.display = 'none';
+  const q = document.getElementById('scDbInput').value.trim();
+  if (!q) return;
+  const r = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+  const results = await r.json();
+  if (!results.length) {
+    document.getElementById('scDbResult').innerHTML = '<div style="color:#555;padding:20px;text-align:center">No players found.</div>';
+    return;
+  }
+  scDbLoadPlayer(results[0]);
+}
+
+async function scDbLoadPlayer(player) {
+  const year = document.getElementById('scDbYear').value;
+  const resultEl = document.getElementById('scDbResult');
+  resultEl.innerHTML = '<div class="loading">Loading Statcast data…</div>';
+  try {
+    const sc = await fetch(`/api/statcast/${player.id}?year=${year}`).then(r=>r.json());
+    const header = `<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:14px;background:#141820;border-radius:10px;border:1px solid #2a2f3e">
+      <img src="${esc(player.headshotUrl||GENERIC_HEADSHOT)}" onerror="this.src='${GENERIC_HEADSHOT}'" style="width:54px;height:54px;border-radius:50%;object-fit:cover">
+      <div>
+        <div style="font-size:1.05rem;font-weight:800;color:#e0e0e0">${esc(player.fullName)}</div>
+        <div style="font-size:0.8rem;color:#666">${esc(player.position||'')} · ${esc(player.currentTeam||'')}</div>
+        <a href="https://baseballsavant.mlb.com/savant-player/${player.id}" target="_blank" style="font-size:0.75rem;color:#4a6fa5;text-decoration:none">View on Baseball Savant ↗</a>
+      </div>
+    </div>`;
+    const body = (sc && Object.keys(sc).length) ? buildStatcastTable(sc, player, parseInt(year)) : `<div class="sc-empty">No Statcast data available for ${year}.</div>`;
+    resultEl.innerHTML = header + body;
+  } catch(e) {
+    resultEl.innerHTML = '<div class="sc-empty">Failed to load Statcast data.</div>';
+  }
+}
+
 async function refreshData() {
   await fetch('/api/refresh', {method:'POST'});
   trackedPlayers.forEach(p => {delete p.ilStatus;});
@@ -2011,6 +2103,7 @@ async function refreshData() {
   else if (currentHub === 'game') showGameHub();
   else if (currentHub === 'news') showNewsHub();
   else if (currentHub === 'video') showVideoHub();
+  else if (currentHub === 'statcast') showStatcastDb();
   else if (activePlayerId) showStats(activePlayerId);
   loadILStatuses();
 }
