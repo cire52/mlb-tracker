@@ -8,22 +8,36 @@ from mlb_api import (search_players, get_game_log, get_player_info, clear_cache,
 app = Flask(__name__)
 # Use /tmp for writable storage on cloud platforms, fallback to local
 TRACKED_FILE = os.path.join(os.environ.get("STORAGE_DIR", "."), "tracked_players.json")
+BACKUP_FILE = TRACKED_FILE + ".bak"
 
 
 def load_tracked(uid=None):
-    if os.path.exists(TRACKED_FILE):
-        with open(TRACKED_FILE) as f:
-            data = json.load(f)
-        if isinstance(data, list):  # migrate old format
-            data = {}
-            _save_all(data)
-        return data.get(uid, []) if uid else data
+    for path in (TRACKED_FILE, BACKUP_FILE):
+        if path and os.path.exists(path):
+            try:
+                with open(path) as f:
+                    data = json.load(f)
+                if isinstance(data, list):
+                    data = {}
+                    _save_all(data)
+                return data.get(uid, []) if uid else data
+            except Exception:
+                continue
     return [] if uid else {}
 
 
 def _save_all(data):
-    with open(TRACKED_FILE, "w") as f:
+    # Write to temp file first, then rename for atomicity
+    tmp = TRACKED_FILE + ".tmp"
+    with open(tmp, "w") as f:
         json.dump(data, f, indent=2)
+    os.replace(tmp, TRACKED_FILE)
+    # Keep a backup copy
+    try:
+        import shutil
+        shutil.copy2(TRACKED_FILE, BACKUP_FILE)
+    except Exception:
+        pass
 
 
 def save_tracked(uid, players):
