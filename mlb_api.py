@@ -851,7 +851,7 @@ def get_fangraphs_stats(player_id, year=2025):
 
 def import_fantrax_url(url):
     """Parse leagueId + teamId from Fantrax URL and fetch roster via unofficial API."""
-    m = re.search(r'/fantasy/league/([^/;?]+)/players[^?]*[;?]teamId=([^&;]+)', url)
+    m = re.search(r'/fantasy/league/([^/;?]+)/(?:players|team/roster)[^?]*[;?]teamId=([^&;]+)', url)
     if not m:
         return {"error": "Could not parse league/team ID from URL. Expected format: fantrax.com/fantasy/league/{leagueId}/players;teamId={teamId}"}
 
