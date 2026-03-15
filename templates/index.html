@@ -2215,6 +2215,7 @@ function renderAuthArea() {
       <div class="auth-avatar">${initial}</div>
       <span class="auth-username">${esc(currentUser.username)}</span>
       ${linkBtn}
+      <button class="hdr-btn" onclick="openChangePassword()" style="padding:4px 9px;font-size:0.72rem">🔑 Password</button>
       <button class="hdr-btn" onclick="logOut()" style="padding:4px 9px;font-size:0.72rem">Sign Out</button>
     </div>`;
     const mobLinkBtn = hasEmail
@@ -2227,6 +2228,7 @@ function renderAuthArea() {
       </div>
       <div style="display:flex;gap:6px">
         ${mobLinkBtn}
+        <button class="mob-footer-btn" style="flex:none;padding:6px 12px" onclick="openChangePassword()">🔑</button>
         <button class="mob-footer-btn" style="flex:none;padding:6px 12px" onclick="logOut()">Sign Out</button>
       </div>
     </div>`;
@@ -2236,6 +2238,35 @@ function renderAuthArea() {
     if (el) el.innerHTML = `<button class="hdr-btn" style="border-color:#c8102e;color:#c8102e;font-weight:700" onclick="openAuth()">Sign In</button>`;
     if (mobEl) mobEl.innerHTML = `<button class="mob-footer-btn" style="width:100%;border-color:#c8102e;color:#c8102e;font-weight:700" onclick="openAuth()">Sign In / Create Account</button>`;
   }
+}
+
+function openChangePassword() {
+  document.getElementById('changePasswordOverlay').style.display = 'flex';
+  document.getElementById('cpCurrent').value = '';
+  document.getElementById('cpNew').value = '';
+  document.getElementById('cpConfirm').value = '';
+  document.getElementById('cpError').textContent = '';
+}
+function closeChangePassword() {
+  document.getElementById('changePasswordOverlay').style.display = 'none';
+}
+async function submitChangePassword() {
+  const errEl = document.getElementById('cpError');
+  errEl.textContent = '';
+  const current = document.getElementById('cpCurrent').value;
+  const newPw = document.getElementById('cpNew').value;
+  const confirm = document.getElementById('cpConfirm').value;
+  if (!current) { errEl.textContent = 'Enter your current password.'; return; }
+  if (newPw.length < 6) { errEl.textContent = 'New password must be at least 6 characters.'; return; }
+  if (newPw !== confirm) { errEl.textContent = 'Passwords do not match.'; return; }
+  try {
+    const res = await fetch('/api/auth/change-password', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({current_password: current, new_password: newPw})});
+    const data = await res.json();
+    if (!res.ok || data.error) { errEl.textContent = data.error || 'Something went wrong.'; return; }
+    errEl.style.color = '#4caf7d';
+    errEl.textContent = 'Password updated successfully!';
+    setTimeout(closeChangePassword, 1500);
+  } catch(e) { errEl.textContent = 'Network error. Please try again.'; }
 }
 
 function openLinkEmail() {
@@ -2483,6 +2514,33 @@ initAuth();
       <div id="linkEmailError" class="auth-error"></div>
     </div>
     <div class="auth-modal-footer"><a href="#" onclick="closeLinkEmail();return false" style="color:#555;text-decoration:none">Cancel</a></div>
+  </div>
+</div>
+
+<!-- Change Password Overlay -->
+<div id="changePasswordOverlay" class="auth-modal-overlay" style="display:none" onclick="if(event.target===this)closeChangePassword()">
+  <div class="auth-modal">
+    <div class="auth-modal-header">
+      <h2>Change Password</h2>
+      <p>Enter your current password and a new one</p>
+    </div>
+    <div class="auth-modal-body">
+      <div class="auth-field">
+        <label>Current Password</label>
+        <input id="cpCurrent" type="password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <div class="auth-field" style="margin-top:10px">
+        <label>New Password</label>
+        <input id="cpNew" type="password" placeholder="at least 6 characters" autocomplete="new-password">
+      </div>
+      <div class="auth-field" style="margin-top:10px">
+        <label>Confirm New Password</label>
+        <input id="cpConfirm" type="password" placeholder="••••••••" autocomplete="new-password" onkeydown="if(event.key==='Enter')submitChangePassword()">
+      </div>
+      <button class="auth-submit" style="margin-top:14px" onclick="submitChangePassword()">Update Password</button>
+      <div id="cpError" class="auth-error"></div>
+    </div>
+    <div class="auth-modal-footer"><a href="#" onclick="closeChangePassword();return false" style="color:#555;text-decoration:none">Cancel</a></div>
   </div>
 </div>
 </body>

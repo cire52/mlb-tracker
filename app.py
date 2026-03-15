@@ -204,6 +204,26 @@ def auth_reset():
     return jsonify({"ok": True, "username": username, "uid": users[username]["uid"]})
 
 
+@app.route("/api/auth/change-password", methods=["POST"])
+def auth_change_password():
+    username = session.get("username")
+    if not username:
+        return jsonify({"error": "Not logged in"}), 401
+    data = request.json or {}
+    current = data.get("current_password", "")
+    new_pw = data.get("new_password", "")
+    if len(new_pw) < 6:
+        return jsonify({"error": "New password must be at least 6 characters"}), 400
+    with _users_lock:
+        users = load_users()
+        user = users.get(username)
+        if not user or not check_password_hash(user["password_hash"], current):
+            return jsonify({"error": "Current password is incorrect"}), 400
+        user["password_hash"] = generate_password_hash(new_pw)
+        save_users(users)
+    return jsonify({"ok": True})
+
+
 @app.route("/api/auth/update-email", methods=["POST"])
 def auth_update_email():
     username = session.get("username")
