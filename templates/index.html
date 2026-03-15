@@ -2029,7 +2029,6 @@ function openImport() {
     if (t === activeTeam || (activeTeam === '__all__' && t === 'Main')) opt.selected = true;
     sel.appendChild(opt);
   });
-  document.getElementById('csvDropZone').onclick = () => document.getElementById('csvFileInput').click();
   document.getElementById('importOverlay').style.display = 'flex';
 }
 
