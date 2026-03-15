@@ -20,6 +20,8 @@ _savant_leaderboard_cache = {}  # {"batter"|"pitcher": (indexed_dict, ts)}
 _bat_tracking_cache = {}        # {year: (indexed_dict, ts)}
 _sprint_speed_cache = {}        # {year: (indexed_dict, ts)}
 _fb_velo_cache = {}             # {year: (indexed_dict, ts)}
+_video_cache = {}               # {player_id: (videos_list, ts)}
+VIDEO_CACHE_TTL = 3600
 _savant_percentile_cache = {}  # {"batter"|"pitcher": (indexed_dict, ts)}
 _nbc_playerurl_cache = {}  # {player_id: (url, ts)}
 _nbc_news_cache = {}       # {player_id: (news_list, ts)}
@@ -991,6 +993,99 @@ def import_fantrax_url(url):
         return {"error": f"Failed to fetch roster: {str(e)}"}
 
 
+def get_player_videos(player_id, season=2025, limit=5):
+    """Return up to `limit` recent MLB highlight videos for a player, cached 1h."""
+    now = time.time()
+    if player_id in _video_cache:
+        videos, ts = _video_cache[player_id]
+        if now - ts < VIDEO_CACHE_TTL:
+            return videos
+
+    pid_str = str(player_id)
+
+    # Get recent game PKs from both hitting and pitching game logs
+    game_pks = []
+    try:
+        for group in ("hitting", "pitching"):
+            data = _get(f"{BASE}/people/{player_id}/stats",
+                        {"stats": "gameLog", "group": group, "season": season,
+                         "sportId": 1, "gameType": "R"})
+            splits = data.get("stats", [{}])[0].get("splits", [])
+            for split in splits:
+                gp = split.get("game", {}).get("gamePk")
+                if gp and gp not in game_pks:
+                    game_pks.append(gp)
+    except Exception:
+        pass
+
+    if not game_pks:
+        _video_cache[player_id] = ([], now)
+        return []
+
+    # Sort descending (most recent first), check up to 20 games
+    game_pks = list(reversed(game_pks))[:20]
+
+    CONTENT_BASE = "https://statsapi.mlb.com/api/v1"
+    videos = []
+
+    def fetch_game_highlights(gp):
+        try:
+            r = requests.get(f"{CONTENT_BASE}/game/{gp}/content",
+                             params={"highlightLimit": 20},
+                             headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+            if not r.ok:
+                return []
+            data = r.json()
+            items = (data.get("highlights", {}).get("highlights", {}).get("items") or
+                     data.get("highlights", {}).get("items") or [])
+            results = []
+            for item in items:
+                # Filter to this player's highlights
+                keywords = item.get("keywordsAll", [])
+                player_ids = [kw.get("value") for kw in keywords
+                              if kw.get("type") == "player_id"]
+                if pid_str not in player_ids:
+                    continue
+                # Extract mp4 URL
+                mp4_url = None
+                for pb in item.get("playbacks", []):
+                    if "mp4" in pb.get("name", "").lower() or "mp4" in pb.get("url", "").lower():
+                        mp4_url = pb.get("url")
+                        break
+                if not mp4_url:
+                    continue
+                # Thumbnail
+                thumb_template = item.get("image", {}).get("templateUrl", "")
+                thumb = thumb_template.replace("{formatInstructions}", "w_480,h_270,f_jpg,c_fill,g_auto") if thumb_template else ""
+                slug = item.get("slug", "")
+                date = item.get("date", "")[:10] if item.get("date") else ""
+                results.append({
+                    "title": item.get("title", ""),
+                    "date": date,
+                    "duration": item.get("duration", ""),
+                    "thumb": thumb,
+                    "mp4": mp4_url,
+                    "url": f"https://www.mlb.com/video/{slug}" if slug else "",
+                })
+            return results
+        except Exception:
+            return []
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as ex:
+        futures = [ex.submit(fetch_game_highlights, gp) for gp in game_pks]
+        for f in concurrent.futures.as_completed(futures):
+            videos.extend(f.result())
+            if len(videos) >= limit:
+                break
+
+    # Sort by date desc, cap at limit
+    videos.sort(key=lambda v: v.get("date", ""), reverse=True)
+    videos = videos[:limit]
+
+    _video_cache[player_id] = (videos, now)
+    return videos
+
+
 def clear_cache():
     _cache.clear()
     _savant_xstats_cache.clear()
@@ -1001,3 +1096,4 @@ def clear_cache():
     _nbc_news_cache.clear()
     _fangraphs_cache.clear()
     _milb_cache.clear()
+    _video_cache.clear()

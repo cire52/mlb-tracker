@@ -3,7 +3,8 @@ import json, os, concurrent.futures, threading
 from mlb_api import (search_players, get_game_log, get_player_info, clear_cache,
                      get_season_totals, get_player_transactions, get_xstats, get_pitch_mix,
                      get_statcast, get_nbc_news, get_career_stats, get_minor_league_stats,
-                     get_schedule, get_splits, get_fangraphs_stats, import_fantrax_url)
+                     get_schedule, get_splits, get_fangraphs_stats, import_fantrax_url,
+                     get_player_videos)
 
 app = Flask(__name__)
 # Use /tmp for writable storage on cloud platforms, fallback to local
@@ -255,6 +256,12 @@ def import_fantrax():
 
     players.sort(key=lambda x: name_order.get(x["fantrax_name"], 999))
     return jsonify({"players": players})
+
+
+@app.route("/api/videos/<int:player_id>")
+def player_videos(player_id):
+    season = int(request.args.get("season", 2025))
+    return jsonify(get_player_videos(player_id, season=season))
 
 
 @app.route("/api/refresh", methods=["POST"])

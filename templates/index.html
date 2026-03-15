@@ -140,6 +140,25 @@
   .hub-news-player { font-size: 0.76rem; font-weight: 700; color: #c8102e; margin-bottom: 4px; cursor: pointer; }
   .hub-news-player:hover { text-decoration: underline; }
 
+  /* Video tab */
+  .video-grid { display: flex; flex-direction: column; gap: 14px; max-width: 700px; }
+  .video-card { display: flex; gap: 14px; background: #141820; border: 1px solid #2a2f3e; border-radius: 10px; overflow: hidden; cursor: pointer; transition: border-color 0.15s; }
+  .video-card:hover { border-color: #c8102e; }
+  .video-thumb { position: relative; flex-shrink: 0; width: 180px; height: 101px; background: #0f1117; }
+  .video-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .video-play-btn { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.35); transition: background 0.15s; }
+  .video-card:hover .video-play-btn { background: rgba(200,16,46,0.5); }
+  .video-play-btn svg { width: 38px; height: 38px; fill: rgba(255,255,255,0.9); }
+  .video-info { flex: 1; padding: 12px 14px; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
+  .video-title { font-size: 0.9rem; font-weight: 600; color: #e0e0e0; line-height: 1.3; }
+  .video-meta { font-size: 0.76rem; color: #666; }
+  /* Video playback modal */
+  .video-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.88); z-index: 600; display: flex; align-items: center; justify-content: center; }
+  .video-modal-inner { position: relative; width: min(860px, 95vw); }
+  .video-modal-inner video { width: 100%; border-radius: 8px; display: block; }
+  .video-modal-close { position: absolute; top: -36px; right: 0; background: none; border: none; color: #aaa; font-size: 1.5rem; cursor: pointer; line-height: 1; padding: 4px 8px; }
+  .video-modal-close:hover { color: #fff; }
+
   /* Main area */
   .main { flex: 1; overflow-y: auto; padding: 24px; }
   .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #444; gap: 12px; }
@@ -616,6 +635,7 @@ async function showStats(playerId) {
     {id:'xstats',   label:'Statcast'},
     {id:'milb',     label:'MiLB'},
     {id:'news',     label:'News'},
+    {id:'videos',   label:'Videos'},
     {id:'notes',    label:'Notes'},
     ...(isPitcher ? [{id:'pitchmix', label:'Pitch Mix'}] : []),
   ];
@@ -700,6 +720,7 @@ function switchMainTab(tabId) {
   else if (tabId === 'pitchmix') loadPitchMixTab(pid);
   else if (tabId === 'notes') loadNotesTab(pid);
   else if (tabId === 'milb') loadMiLBTab(pid, currentPlayerIsPitcher);
+  else if (tabId === 'videos') loadVideosTab(pid);
 }
 
 /* ── Game Log tab ── */
@@ -1255,6 +1276,61 @@ function formatNBCDate(iso) {
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
   } catch(e) { return ''; }
+}
+
+/* ── Videos tab ── */
+let _videoList = [];
+
+async function loadVideosTab(playerId) {
+  const tabEl = document.getElementById('tab-videos');
+  if (!tabEl) return;
+  tabEl.dataset.loaded = '1';
+  tabEl.innerHTML = '<div class="loading">Loading videos…</div>';
+  try {
+    const res = await fetch(`/api/videos/${playerId}?season=2025`);
+    const videos = await res.json();
+    _videoList = videos;
+    if (!videos.length) {
+      tabEl.innerHTML = '<div class="empty-state"><div class="icon">🎬</div><p>No highlight videos found for this season.</p></div>';
+      return;
+    }
+    const rows = videos.map((v, i) => {
+      const thumb = v.thumb
+        ? `<img src="${esc(v.thumb)}" alt="" onerror="this.style.display='none'">`
+        : '';
+      const date = v.date ? `<span>${esc(v.date)}</span> · ` : '';
+      const dur  = v.duration ? `<span>${esc(v.duration)}</span>` : '';
+      return `<div class="video-card" onclick="openVideo(${i})">
+        <div class="video-thumb">
+          ${thumb}
+          <div class="video-play-btn">
+            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          </div>
+        </div>
+        <div class="video-info">
+          <div class="video-title">${esc(v.title)}</div>
+          <div class="video-meta">${date}${dur}</div>
+        </div>
+      </div>`;
+    }).join('');
+    tabEl.innerHTML = `<div class="video-grid">${rows}</div>`;
+  } catch(e) {
+    tabEl.innerHTML = '<div class="empty-state"><p>Failed to load videos.</p></div>';
+  }
+}
+
+function openVideo(idx) {
+  const v = _videoList[idx];
+  if (!v || !v.mp4) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'video-modal-overlay';
+  overlay.innerHTML = `
+    <div class="video-modal-inner">
+      <button class="video-modal-close" onclick="this.closest('.video-modal-overlay').remove()">✕</button>
+      <video controls autoplay playsinline src="${esc(v.mp4)}"></video>
+    </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
 }
 
 /* ── Notes tab ── */
