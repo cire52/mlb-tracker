@@ -53,7 +53,7 @@ def send_reset_email(to_email, reset_url):
     from_email = os.environ.get("FROM_EMAIL", "The Clubhouse <noreply@theclubhouse.app>")
     if not api_key:
         print(f"[reset] RESEND_API_KEY not set — reset URL: {reset_url}")
-        return False
+        return False, "RESEND_API_KEY not configured"
     try:
         import requests as req
         r = req.post(
@@ -74,10 +74,13 @@ def send_reset_email(to_email, reset_url):
             },
             timeout=10
         )
-        return r.ok
+        print(f"[reset] Resend status={r.status_code} body={r.text[:300]}")
+        if not r.ok:
+            return False, r.text
+        return True, None
     except Exception as e:
         print(f"[reset] Email send failed: {e}")
-        return False
+        return False, str(e)
 
 
 @app.route("/api/auth/register", methods=["POST"])
@@ -172,7 +175,10 @@ def auth_forgot():
         save_users(users)
     app_url = os.environ.get("APP_URL", request.host_url.rstrip("/"))
     reset_url = f"{app_url}/?reset={token}"
-    send_reset_email(email, reset_url)
+    ok, err = send_reset_email(email, reset_url)
+    if not ok:
+        print(f"[reset] Failed to send to {email}: {err}")
+        return jsonify({"ok": False, "error": f"Email delivery failed: {err}"}), 500
     return jsonify({"ok": True})
 
 
