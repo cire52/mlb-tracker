@@ -515,7 +515,7 @@ function renderPlayerList() {
         </div>
         <div class="card-actions">
           <button class="gear-btn" onclick="event.stopPropagation(); openGroupPicker(event, ${p.id})" title="Set group">⚙</button>
-          <button class="remove-btn" onclick="event.stopPropagation(); removePlayer(${p.id}, ${JSON.stringify(p.fantasy_team||'Main')})">✕</button>
+          <button class="remove-btn" onclick="event.stopPropagation(); removePlayer(${p.id}, ${JSON.stringify(p.fantasy_team||'Main').replace(/"/g,'&quot;')})">✕</button>
         </div>
       </div>`;
   }).join('');
