@@ -19,6 +19,7 @@ _savant_pitcharsenal_cache = {}  # {year: (indexed_dict, ts)}
 _savant_leaderboard_cache = {}  # {"batter"|"pitcher": (indexed_dict, ts)}
 _bat_tracking_cache = {}        # {year: (indexed_dict, ts)}
 _sprint_speed_cache = {}        # {year: (indexed_dict, ts)}
+_fb_velo_cache = {}             # {year: (indexed_dict, ts)}
 _savant_percentile_cache = {}  # {"batter"|"pitcher": (indexed_dict, ts)}
 _nbc_playerurl_cache = {}  # {player_id: (url, ts)}
 _nbc_news_cache = {}       # {player_id: (news_list, ts)}
@@ -437,6 +438,26 @@ def _load_savant_leaderboard(type_, year=2025):
         return {}
 
 
+def _load_fb_velo(year=2025):
+    """Load pitcher fastball velocity from pitch movement leaderboard, cached 6h."""
+    now = time.time()
+    if year in _fb_velo_cache:
+        data, ts = _fb_velo_cache[year]
+        if now - ts < SAVANT_CACHE_TTL:
+            return data
+    url = (f"https://baseballsavant.mlb.com/leaderboard/pitch-movement"
+           f"?pitcher_throws=&year={year}&team=&pitchType=FF&min=0&csv=true")
+    try:
+        r = requests.get(url, headers=SAVANT_HEADERS, timeout=30)
+        r.raise_for_status()
+        reader = csv.DictReader(io.StringIO(r.content.decode('utf-8-sig')))
+        indexed = {row["pitcher_id"].strip(): row for row in reader if row.get("pitcher_id", "").strip()}
+        _fb_velo_cache[year] = (indexed, now)
+        return indexed
+    except Exception:
+        return {}
+
+
 def _load_bat_tracking(year=2025):
     """Load bat-tracking CSV (bat speed + whiff rate), cached 6h."""
     now = time.time()
@@ -601,6 +622,15 @@ def get_statcast(player_id, year=2025):
                     wtd = sum(float(r.get("pitches") or 0) * float(r.get("whiff_percent") or 0)
                               for r in rows)
                     result["whiff_pct"] = f"{wtd/total:.1f}"
+        except Exception:
+            pass
+
+    # Fastball velo for pitchers (not in standard leaderboard CSV)
+    if player_type == "pitcher":
+        try:
+            fv_row = _load_fb_velo(year).get(pid_str)
+            if fv_row and not result.get("fb_velo") and fv_row.get("avg_speed"):
+                result["fb_velo"] = fv_row["avg_speed"]
         except Exception:
             pass
 
