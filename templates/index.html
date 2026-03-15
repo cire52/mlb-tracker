@@ -142,6 +142,7 @@
 
   /* Video tab */
   .video-grid { display: flex; flex-direction: column; gap: 14px; max-width: 700px; }
+  .video-hub-grid { display: flex; flex-direction: column; gap: 14px; max-width: 800px; }
   .video-card { display: flex; gap: 14px; background: #141820; border: 1px solid #2a2f3e; border-radius: 10px; overflow: hidden; cursor: pointer; transition: border-color 0.15s; }
   .video-card:hover { border-color: #c8102e; }
   .video-thumb { position: relative; flex-shrink: 0; width: 180px; height: 101px; background: #0f1117; }
@@ -388,6 +389,7 @@
     <div class="sidebar-footer">
       <button class="hub-btn" id="hubGameBtn" onclick="showGameHub()">📋 Game Log Hub</button>
       <button class="hub-btn" id="hubNewsBtn" onclick="showNewsHub()">📰 News Hub</button>
+      <button class="hub-btn" id="hubVideoBtn" onclick="showVideoHub()">🎬 Video Hub</button>
       <div class="sport-toggle">
         <button class="sport-btn active" id="btnSpring" onclick="setSport('S')">🌵 Spring</button>
         <button class="sport-btn" id="btnMLB" onclick="setSport('R')">⚾ MLB</button>
@@ -1672,6 +1674,7 @@ function setActiveTeam(name) {
   renderPlayerList();
   if (currentHub === 'game') showGameHub();
   else if (currentHub === 'news') showNewsHub();
+  else if (currentHub === 'video') showVideoHub();
 }
 
 function createTeam() {
@@ -1726,6 +1729,7 @@ async function showGameHub() {
   renderPlayerList();
   document.getElementById('hubGameBtn').classList.add('active');
   document.getElementById('hubNewsBtn').classList.remove('active');
+  document.getElementById('hubVideoBtn').classList.remove('active');
   if (window.innerWidth <= 768) {
     document.getElementById('sidebar').classList.remove('open');
     document.getElementById('sidebarOverlay').classList.remove('open');
@@ -1783,6 +1787,7 @@ async function showNewsHub() {
   renderPlayerList();
   document.getElementById('hubNewsBtn').classList.add('active');
   document.getElementById('hubGameBtn').classList.remove('active');
+  document.getElementById('hubVideoBtn').classList.remove('active');
   if (window.innerWidth <= 768) {
     document.getElementById('sidebar').classList.remove('open');
     document.getElementById('sidebarOverlay').classList.remove('open');
@@ -1833,12 +1838,94 @@ async function showNewsHub() {
   main.innerHTML = html;
 }
 
+/* ── Video Hub ── */
+async function showVideoHub() {
+  currentHub = 'video';
+  activePlayerId = null;
+  renderPlayerList();
+  document.getElementById('hubVideoBtn').classList.add('active');
+  document.getElementById('hubGameBtn').classList.remove('active');
+  document.getElementById('hubNewsBtn').classList.remove('active');
+  if (window.innerWidth <= 768) {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebarOverlay').classList.remove('open');
+  }
+  const main = document.getElementById('main');
+  const hubPlayers = activeTeam === '__all__' ? trackedPlayers : trackedPlayers.filter(p => (p.fantasy_team || 'Main') === activeTeam);
+  if (!hubPlayers.length) {
+    main.innerHTML = '<div class="hub-empty">No players in this team yet.</div>';
+    return;
+  }
+  main.innerHTML = '<div class="hub-title">🎬 Video Hub</div><div class="loading">Loading videos…</div>';
+
+  const results = await Promise.all(
+    hubPlayers.map(p =>
+      fetch(`/api/videos/${p.id}`)
+        .then(r => r.json())
+        .then(videos => videos.map(v => ({ ...v, player: p })))
+        .catch(() => [])
+    )
+  );
+
+  const allVideos = results.flat().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  let html = '<div class="hub-title">🎬 Video Hub</div>';
+
+  if (!allVideos.length) {
+    html += '<div class="hub-empty">No recent videos found for tracked players.</div>';
+  } else {
+    // Group by player for the _videoList used by openVideo, but store all globally
+    window._hubVideoList = allVideos;
+    html += '<div class="video-hub-grid">';
+    allVideos.forEach((v, i) => {
+      const p = v.player;
+      const thumb = v.thumb
+        ? `<img src="${esc(v.thumb)}" alt="" onerror="this.style.display='none'">`
+        : '';
+      const date = v.date ? `<span>${esc(v.date)}</span> · ` : '';
+      const dur  = v.duration ? `<span>${esc(v.duration)}</span>` : '';
+      html += `<div class="video-card" onclick="openHubVideo(${i})">
+        <div class="video-thumb">
+          ${thumb}
+          <div class="video-play-btn">
+            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          </div>
+        </div>
+        <div class="video-info">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <img src="${esc(p.headshotUrl||GENERIC_HEADSHOT)}" onerror="this.src='${GENERIC_HEADSHOT}'" style="width:24px;height:24px;border-radius:50%;object-fit:cover;cursor:pointer;flex-shrink:0" onclick="event.stopPropagation();showStats(${p.id})">
+            <span style="font-size:0.78rem;color:#c8102e;font-weight:700;cursor:pointer" onclick="event.stopPropagation();showStats(${p.id})">${esc(p.fullName)}</span>
+          </div>
+          <div class="video-title">${esc(v.title)}</div>
+          <div class="video-meta">${date}${dur}</div>
+        </div>
+      </div>`;
+    });
+    html += '</div>';
+  }
+  main.innerHTML = html;
+}
+
+function openHubVideo(idx) {
+  const v = window._hubVideoList[idx];
+  if (!v || !v.mp4) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'video-modal-overlay';
+  overlay.innerHTML = `
+    <div class="video-modal-inner">
+      <button class="video-modal-close" onclick="this.closest('.video-modal-overlay').remove()">✕</button>
+      <video controls autoplay playsinline src="${esc(v.mp4)}"></video>
+    </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
 async function refreshData() {
   await fetch('/api/refresh', {method:'POST'});
   trackedPlayers.forEach(p => {delete p.ilStatus;});
   if (compareIds.size >= 2) renderComparison();
   else if (currentHub === 'game') showGameHub();
   else if (currentHub === 'news') showNewsHub();
+  else if (currentHub === 'video') showVideoHub();
   else if (activePlayerId) showStats(activePlayerId);
   loadILStatuses();
 }
