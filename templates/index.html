@@ -170,7 +170,8 @@
   .landing-title span { color: #c8102e; }
   .landing-sub { font-size: 0.95rem; color: #555; margin-bottom: 36px; max-width: 340px; line-height: 1.6; }
   .landing-features { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; max-width: 520px; margin-bottom: 40px; }
-  .landing-feature { background: #141820; border: 1px solid #2a2f3e; border-radius: 10px; padding: 14px 18px; min-width: 140px; flex: 1; }
+  .landing-feature { background: #141820; border: 1px solid #2a2f3e; border-radius: 10px; padding: 14px 18px; min-width: 140px; flex: 1; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+  .landing-feature:hover { border-color: #c8102e; background: #1a1f2e; }
   .landing-feature .feat-icon { font-size: 1.4rem; margin-bottom: 6px; }
   .landing-feature .feat-label { font-size: 0.78rem; font-weight: 600; color: #aaa; }
   .landing-cta { font-size: 0.82rem; color: #3a3f4e; }
@@ -428,10 +429,10 @@ function landingHtml() {
     <div class="landing-title">The <span>Clubhouse</span></div>
     <div class="landing-sub">Your personal MLB scouting hub. Track players, compare Statcast profiles, and stay on top of your fantasy roster.</div>
     <div class="landing-features">
-      <div class="landing-feature"><div class="feat-icon">📋</div><div class="feat-label">Game Logs</div></div>
-      <div class="landing-feature"><div class="feat-icon">📡</div><div class="feat-label">Statcast Data</div></div>
-      <div class="landing-feature"><div class="feat-icon">📰</div><div class="feat-label">Player News</div></div>
-      <div class="landing-feature"><div class="feat-icon">🎬</div><div class="feat-label">Highlights</div></div>
+      <div class="landing-feature" onclick="showGameHub()"><div class="feat-icon">📋</div><div class="feat-label">Game Logs</div></div>
+      <div class="landing-feature" onclick="showGameHub()"><div class="feat-icon">📡</div><div class="feat-label">Statcast Data</div></div>
+      <div class="landing-feature" onclick="showNewsHub()"><div class="feat-icon">📰</div><div class="feat-label">Player News</div></div>
+      <div class="landing-feature" onclick="showVideoHub()"><div class="feat-icon">🎬</div><div class="feat-label">Highlights</div></div>
     </div>
     <div class="landing-cta">Search for a player in the sidebar to get started</div>
   </div>`;
