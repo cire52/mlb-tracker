@@ -224,7 +224,7 @@ def import_fantrax():
     if not names:
         return jsonify({"error": "No player names provided"}), 400
 
-    names = names[:30]
+    names = names[:75]
 
     def search_one(name):
         results = search_players(name)
