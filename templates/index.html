@@ -2208,15 +2208,16 @@ function renderAuthArea() {
     const initial = currentUser.username[0].toUpperCase();
     const hasEmail = currentUser.email;
     const emailTip = hasEmail ? `Email: ${esc(currentUser.email)}` : 'No email linked';
-    const linkBtn = hasEmail
-      ? `<button class="hdr-btn" onclick="openLinkEmail()" style="padding:4px 9px;font-size:0.72rem" title="${emailTip}">✉ ${esc(currentUser.email)}</button>`
-      : `<button class="hdr-btn" onclick="openLinkEmail()" style="padding:4px 9px;font-size:0.72rem;border-color:#f0c040;color:#f0c040" title="Link an email for password recovery">⚠ Link Email</button>`;
-    const desktopHtml = `<div class="auth-user">
-      <div class="auth-avatar">${initial}</div>
-      <span class="auth-username">${esc(currentUser.username)}</span>
-      ${linkBtn}
-      <button class="hdr-btn" onclick="openChangePassword()" style="padding:4px 9px;font-size:0.72rem">🔑 Password</button>
-      <button class="hdr-btn" onclick="logOut()" style="padding:4px 9px;font-size:0.72rem">Sign Out</button>
+    const emailLabel = hasEmail ? `✉ ${esc(currentUser.email)}` : `⚠ Link Email`;
+    const emailStyle = hasEmail ? '' : 'border-color:#f0c040;color:#f0c040;';
+    const desktopHtml = `<div class="auth-user" style="position:relative">
+      <div class="auth-avatar" onclick="toggleAccountMenu()" style="cursor:pointer" title="${esc(currentUser.username)}">${initial}</div>
+      <span class="auth-username" onclick="toggleAccountMenu()" style="cursor:pointer">${esc(currentUser.username)} ▾</span>
+      <div id="accountMenu" style="display:none;position:absolute;top:calc(100% + 6px);right:0;background:#1a1f2e;border:1px solid #3a3f4e;border-radius:8px;padding:6px;min-width:160px;z-index:500;flex-direction:column;gap:4px">
+        <button class="hdr-btn" onclick="openLinkEmail();toggleAccountMenu()" style="padding:6px 10px;font-size:0.75rem;${emailStyle}text-align:left;width:100%">${emailLabel}</button>
+        <button class="hdr-btn" onclick="openChangePassword();toggleAccountMenu()" style="padding:6px 10px;font-size:0.75rem;text-align:left;width:100%">🔑 Change Password</button>
+        <button class="hdr-btn" onclick="logOut()" style="padding:6px 10px;font-size:0.75rem;text-align:left;width:100%;border-color:#c8102e;color:#c8102e">Sign Out</button>
+      </div>
     </div>`;
     const mobLinkBtn = hasEmail
       ? `<button class="mob-footer-btn" style="flex:1;font-size:0.75rem" onclick="openLinkEmail()">✉ ${esc(currentUser.email)}</button>`
@@ -2239,6 +2240,16 @@ function renderAuthArea() {
     if (mobEl) mobEl.innerHTML = `<button class="mob-footer-btn" style="width:100%;border-color:#c8102e;color:#c8102e;font-weight:700" onclick="openAuth()">Sign In / Create Account</button>`;
   }
 }
+
+function toggleAccountMenu() {
+  const m = document.getElementById('accountMenu');
+  if (!m) return;
+  m.style.display = m.style.display === 'none' ? 'flex' : 'none';
+}
+document.addEventListener('click', function(e) {
+  const menu = document.getElementById('accountMenu');
+  if (menu && !menu.closest('.auth-user').contains(e.target)) menu.style.display = 'none';
+});
 
 function openChangePassword() {
   document.getElementById('changePasswordOverlay').style.display = 'flex';
