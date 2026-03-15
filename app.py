@@ -20,6 +20,12 @@ USERS_FILE = os.path.join(STORAGE_DIR, "users.json")
 _save_lock = threading.Lock()
 _users_lock = threading.Lock()
 
+# Warn at startup if data won't persist across redeploys
+if STORAGE_DIR == ".":
+    print("WARNING: STORAGE_DIR not set — data stored in app directory and will be lost on redeploy. Set STORAGE_DIR to a mounted volume path.")
+else:
+    print(f"INFO: Storage directory: {STORAGE_DIR}")
+
 
 # ── User storage ──────────────────────────────────────────────────────────────
 
