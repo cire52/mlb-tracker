@@ -1511,11 +1511,12 @@ function renderTeamBar() {
   let html = `<span class="team-tab ${activeTeam === '__all__' ? 'active' : ''}" onclick="setActiveTeam('__all__')"><span class="t-name">All</span></span>`;
   teams.forEach((t, i) => {
     const isDefault = (t === defaultTeam);
-    html += `<span class="team-tab ${activeTeam === t ? 'active' : ''}" onclick="setActiveTeam(_teamsList[${i}])">
-      <span class="t-name">${esc(t)}</span>
-      <span class="team-x" onclick="event.stopPropagation();renameTeam(${i})" title="Rename team">✎</span>
-      ${isDefault ? '' : `<span class="team-x" onclick="event.stopPropagation();deleteTeam(${i})" title="Delete team">✕</span>`}
-    </span>`;
+    const deleteBtn = isDefault ? '' : '<span class="team-x" onclick="event.stopPropagation();deleteTeam(' + i + ')" title="Delete team">\u2715</span>';
+    html += '<span class="team-tab ' + (activeTeam === t ? 'active' : '') + '" onclick="setActiveTeam(_teamsList[' + i +'])">'
+      + '<span class="t-name">' + esc(t) + '</span>'
+      + '<span class="team-x" onclick="event.stopPropagation();renameTeam(' + i + ')" title="Rename team">\u270e</span>'
+      + deleteBtn
+      + '</span>';
   });
   html += `<span class="team-tab-add" onclick="createTeam()">+ Team</span>`;
   bar.innerHTML = html;
@@ -1713,6 +1714,7 @@ function openImport() {
     if (t === activeTeam || (activeTeam === '__all__' && t === 'Main')) opt.selected = true;
     sel.appendChild(opt);
   });
+  document.getElementById('csvDropZone').onclick = () => document.getElementById('csvFileInput').click();
   document.getElementById('importOverlay').style.display = 'flex';
 }
 
@@ -1884,7 +1886,6 @@ async function addImportSelected() {
           <span style="font-size:0.74rem;color:#555">In Fantrax: Roster page → Export → Download CSV</span>
           <input type="file" accept=".csv" id="csvFileInput" style="display:none" onchange="handleCsvUpload(this)">
         </label>
-        <script>document.getElementById('csvDropZone').onclick = () => document.getElementById('csvFileInput').click();</script>
         <div id="csvFileName" style="font-size:0.78rem;color:#4caf7d;margin-top:6px;text-align:center"></div>
       </div>
       <div id="importPanelNames" style="display:none">
