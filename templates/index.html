@@ -1427,18 +1427,120 @@ async function renderStatcastComparison(players) {
   if (loadingEl) loadingEl.style.display = 'none';
   if (!tableEl) return;
 
-  const cols = players.map(function(p, i) {
-    const sc = results[i];
-    const header = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid #2a2f3e">'
-      + '<img src="' + esc(p.headshotUrl||'') + '" onerror="this.src=\'' + GENERIC_HEADSHOT + '\'" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid #c8102e;flex-shrink:0">'
-      + '<div><div style="font-size:0.88rem;font-weight:700">' + esc(p.fullName) + '</div>'
-      + '<div style="font-size:0.74rem;color:#888">' + esc(p.position) + ' \xb7 ' + esc(p.currentTeamAbbrev||'') + '</div></div>'
-      + '</div>';
-    const body = sc ? buildStatcastTable(sc, p, year) : '<div class="sc-empty">No Statcast data available.</div>';
-    return '<div style="flex:1;min-width:260px">' + header + body + '</div>';
-  }).join('');
+  const sc0 = results[0], sc1 = results[1];
+  const pl0 = players[0], pl1 = players[1];
 
-  tableEl.innerHTML = '<div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start">' + cols + '</div>';
+  const fmt3 = v => v ? String(parseFloat(v).toFixed(3)).replace(/^0\./, '.') : '';
+  const fmt1 = v => v ? parseFloat(v).toFixed(1) : '';
+  const fmtPctVal = v => { if (!v) return ''; const n = parseFloat(v); if (isNaN(n)) return ''; return (n < 2 ? (n*100).toFixed(1) : n.toFixed(1)) + '%'; };
+  const fmtMph = v => v ? parseFloat(v).toFixed(1) + ' mph' : '';
+  const fmtFts = v => v ? parseFloat(v).toFixed(1) + ' ft/s' : '';
+  function pctColor(pct) {
+    if (pct >= 84) return '#7f1d1d'; if (pct >= 67) return '#c8102e';
+    if (pct >= 50) return '#d96060'; if (pct >= 34) return '#5080c8';
+    if (pct >= 17) return '#1d4ed8'; return '#1e3a8a';
+  }
+
+  const isPitcher = (sc0 && sc0.type === 'pitcher') || (sc1 && sc1.type === 'pitcher');
+  const sections = isPitcher ? [
+    { title: 'Expected Stats', metrics: [
+      { label: 'xERA',          pct: sc => sc?.percentiles?.xera,             val: sc => sc?.xera || '' },
+      { label: 'xBA',           pct: sc => sc?.percentiles?.xba,              val: sc => fmt3(sc?.xba) },
+      { label: 'xwOBA',         pct: sc => sc?.percentiles?.xwoba,            val: sc => fmt3(sc?.xwoba) },
+    ]},
+    { title: 'Pitching', metrics: [
+      { label: 'Fastball Velo', pct: sc => sc?.percentiles?.fb_velocity,      val: sc => fmtMph(sc?.fb_velo) },
+      { label: 'Avg EV Against',pct: sc => sc?.percentiles?.exit_velocity,    val: sc => sc?.avg_ev_against ? fmt1(sc.avg_ev_against) + ' mph' : '' },
+      { label: 'Chase %',       pct: sc => sc?.percentiles?.chase_percent,    val: sc => fmtPctVal(sc?.chase_pct) },
+      { label: 'Whiff %',       pct: sc => sc?.percentiles?.whiff_percent,    val: sc => fmtPctVal(sc?.whiff_pct) },
+      { label: 'K %',           pct: sc => sc?.percentiles?.k_percent,        val: sc => fmtPctVal(sc?.k_pct) },
+      { label: 'BB %',          pct: sc => sc?.percentiles?.bb_percent,       val: sc => fmtPctVal(sc?.bb_pct) },
+      { label: 'Barrel %',      pct: sc => sc?.percentiles?.brl_percent,      val: sc => sc?.barrel_pct_against ? fmt1(sc.barrel_pct_against) + '%' : '' },
+      { label: 'Hard-Hit %',    pct: sc => sc?.percentiles?.hard_hit_percent, val: sc => sc?.hard_hit_pct_against ? fmt1(sc.hard_hit_pct_against) + '%' : '' },
+    ]},
+  ] : [
+    { title: 'Expected Stats', metrics: [
+      { label: 'xwOBA',         pct: sc => sc?.percentiles?.xwoba,            val: sc => fmt3(sc?.xwoba) },
+      { label: 'xBA',           pct: sc => sc?.percentiles?.xba,              val: sc => fmt3(sc?.xba) },
+      { label: 'xSLG',          pct: sc => sc?.percentiles?.xslg,             val: sc => fmt3(sc?.xslg) },
+    ]},
+    { title: 'Hitting', metrics: [
+      { label: 'Avg Exit Velo', pct: sc => sc?.percentiles?.exit_velocity,    val: sc => sc?.avg_ev ? fmt1(sc.avg_ev) + ' mph' : '' },
+      { label: 'Hard-Hit %',    pct: sc => sc?.percentiles?.hard_hit_percent, val: sc => sc?.hard_hit_pct ? fmt1(sc.hard_hit_pct) + '%' : '' },
+      { label: 'Barrel %',      pct: sc => sc?.percentiles?.brl_percent,      val: sc => sc?.barrel_pct ? fmt1(sc.barrel_pct) + '%' : '' },
+      { label: 'K %',           pct: sc => sc?.percentiles?.k_percent,        val: sc => fmtPctVal(sc?.k_pct) },
+      { label: 'BB %',          pct: sc => sc?.percentiles?.bb_percent,       val: sc => fmtPctVal(sc?.bb_pct) },
+      { label: 'Whiff %',       pct: sc => sc?.percentiles?.whiff_percent,    val: sc => fmtPctVal(sc?.whiff_pct) },
+      { label: 'Chase %',       pct: sc => sc?.percentiles?.chase_percent,    val: sc => fmtPctVal(sc?.chase_pct) },
+      { label: 'Sprint Speed',  pct: sc => sc?.percentiles?.sprint_speed,     val: sc => fmtFts(sc?.sprint_speed) },
+      { label: 'Bat Speed',     pct: sc => sc?.percentiles?.bat_speed,        val: sc => fmtMph(sc?.bat_speed) },
+    ]},
+  ];
+
+  // Tally wins
+  let wins0 = 0, wins1 = 0;
+  sections.forEach(s => s.metrics.forEach(m => {
+    const v0 = m.pct(sc0), v1 = m.pct(sc1);
+    if (v0 != null && v1 != null) { if (v0 > v1) wins0++; else if (v1 > v0) wins1++; }
+  }));
+
+  function pctCell(sc, m, isWinner) {
+    const rawPct = m.pct(sc), rawVal = m.val(sc || {});
+    if (rawPct == null) return '<div style="flex:1;padding:5px 8px;display:flex;align-items:center"><span style="color:#333;font-size:0.72rem">—</span></div>';
+    const pct = Math.max(0, Math.min(100, rawPct));
+    const color = pctColor(pct);
+    const dim = isWinner === false;
+    const badge = isWinner ? '<span style="color:#4caf50;font-size:0.7rem;font-weight:800;flex-shrink:0;margin-left:2px">▲</span>' : '<span style="width:12px;flex-shrink:0"></span>';
+    return '<div style="flex:1;padding:5px 8px' + (isWinner ? ';background:rgba(76,175,80,0.07)' : '') + '">'
+      + '<div style="display:flex;align-items:center;gap:5px">'
+      + '<div style="flex:1;background:#1a1f2e;border-radius:3px;height:20px;position:relative;min-width:30px">'
+      + '<div style="width:' + pct + '%;height:100%;background:' + color + ';border-radius:3px;position:absolute;opacity:' + (dim ? '0.4' : '1') + '"></div>'
+      + '<div style="position:absolute;top:50%;transform:translate(-50%,-50%);left:' + pct + '%;width:20px;height:20px;border-radius:50%;background:' + color + ';display:flex;align-items:center;justify-content:center;font-size:0.58rem;font-weight:800;color:#fff;border:2px solid #141820;opacity:' + (dim ? '0.5' : '1') + '">' + pct + '</div>'
+      + '</div>'
+      + '<div style="font-size:0.71rem;color:' + (isWinner ? '#ccc' : '#666') + ';white-space:nowrap;min-width:32px;text-align:right">' + rawVal + '</div>'
+      + badge
+      + '</div></div>';
+  }
+
+  function compRow(m) {
+    const v0 = m.pct(sc0), v1 = m.pct(sc1);
+    if (v0 == null && v1 == null) return '';
+    const winner = v0 != null && v1 != null ? (v0 > v1 ? 0 : v1 > v0 ? 1 : -1) : -1;
+    return '<div style="display:flex;align-items:center;border-bottom:1px solid #1a1f2e">'
+      + '<div style="width:88px;flex-shrink:0;font-size:0.72rem;color:#888;padding:5px 8px;border-right:1px solid #1a1f2e">' + m.label + '</div>'
+      + pctCell(sc0, m, winner === 0 ? true : winner === 1 ? false : null)
+      + '<div style="width:1px;background:#1a1f2e;align-self:stretch"></div>'
+      + pctCell(sc1, m, winner === 1 ? true : winner === 0 ? false : null)
+      + '</div>';
+  }
+
+  function playerHdr(p, winsThis, winsOther) {
+    const ahead = winsThis > winsOther;
+    return '<div style="flex:1;display:flex;align-items:center;gap:8px;padding:8px 10px">'
+      + '<img src="' + esc(p.headshotUrl||'') + '" onerror="this.src=\'' + GENERIC_HEADSHOT + '\'" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:2px solid ' + (ahead ? '#4caf50' : '#c8102e') + ';flex-shrink:0">'
+      + '<div><div style="font-size:0.82rem;font-weight:700;color:' + (ahead ? '#e0e0e0' : '#aaa') + '">' + esc(p.fullName) + '</div>'
+      + '<div style="font-size:0.7rem;color:#888">' + esc(p.position) + ' · ' + esc(p.currentTeamAbbrev||'') + ' <span style="color:' + (ahead ? '#4caf50' : '#666') + ';font-weight:600">' + winsThis + ' better</span></div></div>'
+      + '</div>';
+  }
+
+  let html = '<div style="border:1px solid #2a2f3e;border-radius:10px;overflow:hidden;background:#0f1117">';
+  html += '<div style="display:flex;border-bottom:1px solid #2a2f3e;background:#131720">'
+    + '<div style="width:88px;flex-shrink:0;border-right:1px solid #2a2f3e;padding:8px;font-size:0.65rem;text-transform:uppercase;letter-spacing:.8px;color:#555;display:flex;align-items:center">Stat</div>'
+    + playerHdr(pl0, wins0, wins1)
+    + '<div style="width:1px;background:#2a2f3e;align-self:stretch"></div>'
+    + playerHdr(pl1, wins1, wins0)
+    + '</div>';
+
+  for (const section of sections) {
+    const rows = section.metrics.map(compRow).filter(Boolean).join('');
+    if (!rows) continue;
+    html += '<div style="border-bottom:1px solid #2a2f3e">'
+      + '<div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:.8px;color:#555;padding:4px 8px;border-bottom:1px solid #1a1f2e;background:#0d1017">' + section.title + '</div>'
+      + rows + '</div>';
+  }
+
+  html += '<div style="text-align:right;padding:5px 10px;font-size:0.68rem;color:#444">via <a href="https://baseballsavant.mlb.com" target="_blank" rel="noopener" style="color:#444">Baseball Savant</a></div></div>';
+  tableEl.innerHTML = html;
 }
 
 /* ── Export CSV ── */
