@@ -96,6 +96,28 @@
   .gp-save:hover { background: #e01535; }
 
 
+  /* Auth */
+  .auth-user { display: flex; align-items: center; gap: 7px; }
+  .auth-avatar { width: 26px; height: 26px; border-radius: 50%; background: #c8102e; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; color: #fff; flex-shrink: 0; }
+  .auth-username { font-size: 0.78rem; color: #ccc; font-weight: 600; white-space: nowrap; }
+  .auth-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 600; display: flex; align-items: center; justify-content: center; }
+  .auth-modal { background: #1a1f2e; border: 1px solid #3a3f4e; border-radius: 14px; width: 360px; max-width: 95vw; overflow: hidden; }
+  .auth-modal-header { padding: 20px 24px 0; }
+  .auth-modal-header h2 { font-size: 1.2rem; font-weight: 800; color: #fff; margin-bottom: 4px; }
+  .auth-modal-header p { font-size: 0.8rem; color: #666; }
+  .auth-tabs { display: flex; gap: 0; border-bottom: 1px solid #2a2f3e; margin: 16px 0 0; }
+  .auth-tab { flex: 1; padding: 10px; border: none; background: none; color: #666; font-size: 0.85rem; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; font-weight: 600; transition: all 0.15s; }
+  .auth-tab.active { color: #fff; border-bottom-color: #c8102e; }
+  .auth-modal-body { padding: 20px 24px 24px; display: flex; flex-direction: column; gap: 12px; }
+  .auth-field { display: flex; flex-direction: column; gap: 5px; }
+  .auth-field label { font-size: 0.75rem; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+  .auth-field input { padding: 10px 12px; background: #0f1117; border: 1px solid #3a3f4e; border-radius: 8px; color: #e0e0e0; font-size: 0.9rem; outline: none; }
+  .auth-field input:focus { border-color: #c8102e; }
+  .auth-submit { padding: 11px; background: #c8102e; border: none; border-radius: 8px; color: #fff; font-size: 0.9rem; font-weight: 700; cursor: pointer; margin-top: 4px; transition: background 0.15s; }
+  .auth-submit:hover { background: #a00d24; }
+  .auth-error { font-size: 0.8rem; color: #ff6b6b; text-align: center; min-height: 18px; }
+  .auth-modal-footer { padding: 0 24px 18px; text-align: center; font-size: 0.75rem; color: #444; }
+
   /* Import modal */
   .import-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 500; display: flex; align-items: center; justify-content: center; }
   .import-modal { background: #1a1f2e; border: 1px solid #3a3f4e; border-radius: 12px; width: 520px; max-width: 95vw; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; }
@@ -376,6 +398,8 @@
     <button class="hdr-btn" onclick="refreshData()" title="Refresh Data">↻</button>
     <button class="hdr-btn" onclick="exportCSV()" title="Export CSV">↓ CSV</button>
     <button class="hdr-btn" style="border-color:#4a6fa5;color:#4a6fa5" onclick="openImport()" title="Import">↑ Import</button>
+    <div class="hdr-divider"></div>
+    <div id="authArea"></div>
   </div>
   <button class="mob-menu-btn" onclick="toggleSidebar()">☰</button>
 </header>
@@ -494,7 +518,7 @@ function setFilter(pos) {
 }
 
 async function loadTracked() {
-  const res = await fetch('/api/tracked?uid=' + UID);
+  const res = await fetch('/api/tracked?uid=' + getUID());
   trackedPlayers = await res.json();
   renderTeamBar();
   renderPlayerList();
@@ -609,7 +633,7 @@ async function setGroup(playerId, group) {
   groupPickerTarget = null;
   const p = trackedPlayers.find(x => x.id === playerId);
   if (p) p.group = group;
-  await fetch(`/api/track/${playerId}/group?uid=${UID}`, {
+  await fetch(`/api/track/${playerId}/group?uid=${getUID()}`, {
     method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({group})
   });
   renderPlayerList();
@@ -1378,7 +1402,7 @@ function loadNotesTab(playerId) {
     const note = this.value;
     const player = trackedPlayers.find(x => x.id === playerId);
     if (player) player.note = note;
-    await fetch(`/api/track/${playerId}/note?uid=${UID}`, {
+    await fetch(`/api/track/${playerId}/note?uid=${getUID()}`, {
       method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({note})
     });
     renderPlayerList();
@@ -1651,7 +1675,7 @@ async function doSearch(q) {
 
 async function addPlayer(p) {
   const fantasyTeam = (activeTeam !== '__all__') ? activeTeam : defaultTeam;
-  await fetch('/api/track', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...p, uid:UID, fantasy_team: fantasyTeam})});
+  await fetch('/api/track', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...p, uid:getUID(), fantasy_team: fantasyTeam})});
   document.getElementById('searchInput').value = '';
   document.getElementById('searchResults').style.display = 'none';
   await loadTracked();
@@ -1660,7 +1684,7 @@ async function addPlayer(p) {
 
 async function removePlayer(id, team) {
   const t = team || activeTeam || 'Main';
-  await fetch(`/api/track/${id}?uid=${UID}&team=${encodeURIComponent(t)}`, {method:'DELETE'});
+  await fetch(`/api/track/${id}?uid=${getUID()}&team=${encodeURIComponent(t)}`, {method:'DELETE'});
   if (activePlayerId === id) {
     activePlayerId = null;
     document.getElementById('main').innerHTML = '<div class="empty-state"><div class="icon">⚾</div><p>Select a player to view stats</p></div>';
@@ -1720,7 +1744,7 @@ async function renameTeam(i) {
   const newName = prompt('Rename team:', old);
   if (!newName || !newName.trim() || newName.trim() === old) return;
   const trimmed = newName.trim();
-  await fetch(`/api/teams/rename?uid=${UID}`, {
+  await fetch(`/api/teams/rename?uid=${getUID()}`, {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({old_name: old, new_name: trimmed})
   });
@@ -1737,7 +1761,7 @@ async function renameTeam(i) {
 async function deleteTeam(i) {
   const name = window._teamsList[i];
   if (!confirm(`Delete team "${name}"?\n\nPlayers will move to Main.`)) return;
-  await fetch(`/api/teams/rename?uid=${UID}`, {
+  await fetch(`/api/teams/rename?uid=${getUID()}`, {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({old_name: name, new_name: 'Main'})
   });
@@ -2116,7 +2140,7 @@ async function addImportSelected() {
   for (const item of toAdd) {
     try {
       const res = await fetch('/api/track', {method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({...item.mlb, uid: UID, fantasy_team: fantasyTeam})});
+        body: JSON.stringify({...item.mlb, uid: getUID(), fantasy_team: fantasyTeam})});
       if (!res.ok) failed++;
     } catch(e) { failed++; }
     done++;
@@ -2126,6 +2150,95 @@ async function addImportSelected() {
   await loadTracked();
   if (failed) alert(`${failed} player(s) failed to save. Try importing again.`);
 }
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+let currentUser = null; // {username, uid} when logged in
+
+async function initAuth() {
+  try {
+    const res = await fetch('/api/auth/me');
+    const data = await res.json();
+    if (data.username) {
+      currentUser = data;
+      renderAuthArea();
+      // Reload tracked players using the account's UID
+      await loadTracked();
+    } else {
+      renderAuthArea();
+    }
+  } catch(e) { renderAuthArea(); }
+}
+
+function renderAuthArea() {
+  const el = document.getElementById('authArea');
+  if (!el) return;
+  if (currentUser) {
+    const initial = currentUser.username[0].toUpperCase();
+    el.innerHTML = `<div class="auth-user">
+      <div class="auth-avatar">${initial}</div>
+      <span class="auth-username">${esc(currentUser.username)}</span>
+      <button class="hdr-btn" onclick="logOut()" style="padding:4px 9px;font-size:0.72rem">Sign Out</button>
+    </div>`;
+  } else {
+    el.innerHTML = `<button class="hdr-btn" style="border-color:#c8102e;color:#c8102e;font-weight:700" onclick="openAuth()">Sign In</button>`;
+  }
+}
+
+function getUID() {
+  return currentUser ? currentUser.uid : UID;
+}
+
+function openAuth(tab = 'login') {
+  document.getElementById('authOverlay').style.display = 'flex';
+  switchAuthTab(tab);
+  document.getElementById('authError').textContent = '';
+}
+
+function closeAuth() {
+  document.getElementById('authOverlay').style.display = 'none';
+}
+
+function switchAuthTab(tab) {
+  document.getElementById('authTabLogin').classList.toggle('active', tab === 'login');
+  document.getElementById('authTabRegister').classList.toggle('active', tab === 'register');
+  document.getElementById('authFormLogin').style.display = tab === 'login' ? '' : 'none';
+  document.getElementById('authFormRegister').style.display = tab === 'register' ? '' : 'none';
+  document.getElementById('authError').textContent = '';
+}
+
+async function submitAuth(mode) {
+  const errEl = document.getElementById('authError');
+  errEl.textContent = '';
+  const username = document.getElementById(`auth${mode}User`).value.trim();
+  const password = document.getElementById(`auth${mode}Pass`).value;
+  if (!username || !password) { errEl.textContent = 'Please fill in all fields.'; return; }
+  if (mode === 'Register') {
+    const confirm = document.getElementById('authRegisterConfirm').value;
+    if (password !== confirm) { errEl.textContent = 'Passwords do not match.'; return; }
+  }
+  try {
+    const res = await fetch(`/api/auth/${mode.toLowerCase()}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({username, password})
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) { errEl.textContent = data.error || 'Something went wrong.'; return; }
+    currentUser = {username: data.username, uid: data.uid};
+    closeAuth();
+    renderAuthArea();
+    await loadTracked();
+  } catch(e) { errEl.textContent = 'Network error. Please try again.'; }
+}
+
+async function logOut() {
+  await fetch('/api/auth/logout', {method: 'POST'});
+  currentUser = null;
+  renderAuthArea();
+  await loadTracked();
+}
+
+initAuth();
 </script>
 
 <!-- Fantrax Import Overlay -->
@@ -2173,6 +2286,35 @@ async function addImportSelected() {
       <button class="import-action-btn" style="background:#1e2435;color:#888;border:1px solid #3a3f4e" onclick="closeImport()">Cancel</button>
       <button class="import-action-btn" style="background:#4caf7d;color:#fff" onclick="addImportSelected()">Add Selected</button>
     </div>
+  </div>
+</div>
+
+<!-- Auth Overlay -->
+<div id="authOverlay" class="auth-modal-overlay" style="display:none" onclick="if(event.target===this)closeAuth()">
+  <div class="auth-modal">
+    <div class="auth-modal-header">
+      <h2>The Clubhouse</h2>
+      <p>Sign in to sync your roster across devices</p>
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="authTabLogin" onclick="switchAuthTab('login')">Sign In</button>
+        <button class="auth-tab" id="authTabRegister" onclick="switchAuthTab('register')">Create Account</button>
+      </div>
+    </div>
+    <div class="auth-modal-body">
+      <div id="authFormLogin">
+        <div class="auth-field"><label>Username</label><input id="authLoginUser" type="text" placeholder="your username" autocomplete="username"></div>
+        <div class="auth-field" style="margin-top:10px"><label>Password</label><input id="authLoginPass" type="password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitAuth('Login')"></div>
+        <button class="auth-submit" style="margin-top:14px" onclick="submitAuth('Login')">Sign In</button>
+      </div>
+      <div id="authFormRegister" style="display:none">
+        <div class="auth-field"><label>Username</label><input id="authRegisterUser" type="text" placeholder="3–20 chars, letters/numbers/_" autocomplete="username"></div>
+        <div class="auth-field" style="margin-top:10px"><label>Password</label><input id="authRegisterPass" type="password" placeholder="at least 6 characters" autocomplete="new-password"></div>
+        <div class="auth-field" style="margin-top:10px"><label>Confirm Password</label><input id="authRegisterConfirm" type="password" placeholder="••••••••" autocomplete="new-password" onkeydown="if(event.key==='Enter')submitAuth('Register')"></div>
+        <button class="auth-submit" style="margin-top:14px" onclick="submitAuth('Register')">Create Account</button>
+      </div>
+      <div id="authError" class="auth-error"></div>
+    </div>
+    <div class="auth-modal-footer">Your roster is stored securely on the server</div>
   </div>
 </div>
 </body>

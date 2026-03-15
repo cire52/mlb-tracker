@@ -1,5 +1,6 @@
-from flask import Flask, jsonify, request, render_template
-import json, os, concurrent.futures, threading
+from flask import Flask, jsonify, request, render_template, session
+import json, os, concurrent.futures, threading, re
+from werkzeug.security import generate_password_hash, check_password_hash
 from mlb_api import (search_players, get_game_log, get_player_info, clear_cache,
                      get_season_totals, get_player_transactions, get_xstats, get_pitch_mix,
                      get_statcast, get_nbc_news, get_career_stats, get_minor_league_stats,
@@ -7,10 +8,91 @@ from mlb_api import (search_players, get_game_log, get_player_info, clear_cache,
                      get_player_videos)
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "clubhouse-dev-key-please-set-SECRET_KEY-env")
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = os.environ.get("RAILWAY_ENVIRONMENT") is not None
+
 # Use /tmp for writable storage on cloud platforms, fallback to local
-TRACKED_FILE = os.path.join(os.environ.get("STORAGE_DIR", "."), "tracked_players.json")
+STORAGE_DIR = os.environ.get("STORAGE_DIR", ".")
+TRACKED_FILE = os.path.join(STORAGE_DIR, "tracked_players.json")
 BACKUP_FILE = TRACKED_FILE + ".bak"
-_save_lock = threading.Lock()  # prevents race conditions between gthread workers
+USERS_FILE = os.path.join(STORAGE_DIR, "users.json")
+_save_lock = threading.Lock()
+_users_lock = threading.Lock()
+
+
+# ── User storage ──────────────────────────────────────────────────────────────
+
+def load_users():
+    if os.path.exists(USERS_FILE):
+        try:
+            with open(USERS_FILE) as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def save_users(users):
+    tmp = USERS_FILE + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(users, f, indent=2)
+    os.replace(tmp, USERS_FILE)
+
+
+# ── Auth routes ───────────────────────────────────────────────────────────────
+
+@app.route("/api/auth/register", methods=["POST"])
+def auth_register():
+    data = request.json or {}
+    username = (data.get("username") or "").strip().lower()
+    password = data.get("password", "")
+    if not re.match(r'^[a-z0-9_]{3,20}$', username):
+        return jsonify({"error": "Username must be 3–20 characters (letters, numbers, underscores)"}), 400
+    if len(password) < 6:
+        return jsonify({"error": "Password must be at least 6 characters"}), 400
+    with _users_lock:
+        users = load_users()
+        if username in users:
+            return jsonify({"error": "Username already taken"}), 409
+        import uuid
+        uid = "user_" + uuid.uuid4().hex[:16]
+        users[username] = {"password_hash": generate_password_hash(password), "uid": uid}
+        save_users(users)
+    session["username"] = username
+    return jsonify({"ok": True, "username": username, "uid": uid})
+
+
+@app.route("/api/auth/login", methods=["POST"])
+def auth_login():
+    data = request.json or {}
+    username = (data.get("username") or "").strip().lower()
+    password = data.get("password", "")
+    users = load_users()
+    user = users.get(username)
+    if not user or not check_password_hash(user["password_hash"], password):
+        return jsonify({"error": "Invalid username or password"}), 401
+    session["username"] = username
+    return jsonify({"ok": True, "username": username, "uid": user["uid"]})
+
+
+@app.route("/api/auth/logout", methods=["POST"])
+def auth_logout():
+    session.pop("username", None)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/auth/me")
+def auth_me():
+    username = session.get("username")
+    if not username:
+        return jsonify({})
+    users = load_users()
+    user = users.get(username)
+    if not user:
+        session.pop("username", None)
+        return jsonify({})
+    return jsonify({"username": username, "uid": user["uid"]})
 
 
 def load_tracked(uid=None):
