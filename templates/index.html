@@ -473,7 +473,7 @@ function renderPlayerList() {
     players = players.filter(p => (p.fantasy_team || 'Main') === activeTeam);
   }
   if (sidebarFilter !== 'ALL') {
-    players = players.filter(p => sidebarFilter === 'P' ? ['P','SP','RP'].includes(p.position) : p.position === sidebarFilter);
+    players = players.filter(p => sidebarFilter === 'P' ? ['P','SP','RP'].includes(p.position) : sidebarFilter === 'OF' ? ['OF','LF','CF','RF'].includes(p.position) : p.position === sidebarFilter);
   }
 
   players.sort((a, b) => {
