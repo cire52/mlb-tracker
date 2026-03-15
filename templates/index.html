@@ -743,8 +743,8 @@ async function loadGameLogTab(playerId, isPitcher) {
           <button class="tab ${defaultTab==='pitching'?'active':''}" id="subPitch" onclick="switchSubTab('pitching')">⚾ Pitching</button>
         </div>`;
       }
-      if (hasHitting) html += `<div id="hitLog" ${showSwitch&&defaultTab==='pitching'?'style="display:none"':''}>${buildHittingTable(data.hitting)}${buildRollingStrip(data.hitting,'hitting')}</div>`;
-      if (hasPitching) html += `<div id="pitchLog" ${showSwitch&&defaultTab==='hitting'?'style="display:none"':''}>${buildPitchingTable(data.pitching)}${buildRollingStrip(data.pitching,'pitching')}</div>`;
+      if (hasHitting) html += `<div id="hitLog" ${showSwitch&&defaultTab==='pitching'?'style="display:none"':''}>${buildHittingTable(data.hitting.slice(0,10))}${buildRollingStrip(data.hitting,'hitting')}</div>`;
+      if (hasPitching) html += `<div id="pitchLog" ${showSwitch&&defaultTab==='hitting'?'style="display:none"':''}>${buildPitchingTable(data.pitching.slice(0,10))}${buildRollingStrip(data.pitching,'pitching')}</div>`;
       tabEl.innerHTML = html;
     }
     tabEl.dataset.loaded = '1';
