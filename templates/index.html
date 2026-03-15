@@ -374,7 +374,8 @@
     .header-actions { display: none; }
     .mob-sidebar-footer { display: flex; }
     .layout { height: auto; min-height: calc(100vh - 52px); }
-    .sidebar { position: fixed; top: 52px; left: -300px; height: calc(100vh - 52px); z-index: 200; transition: left 0.22s ease; overflow-y: auto; }
+    .sidebar { position: fixed; top: 52px; left: -300px; height: calc(100vh - 52px); z-index: 200; transition: left 0.22s ease; overflow-y: auto; flex-direction: column; }
+    .tracked-list { flex: none; overflow-y: visible; }
     .sidebar.open { left: 0; box-shadow: 4px 0 24px rgba(0,0,0,0.5); }
     .sidebar-overlay.open { display: block; }
     .main { padding: 14px; width: 100%; }
