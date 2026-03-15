@@ -732,7 +732,7 @@ async function loadGameLogTab(playerId, isPitcher) {
     const hasPitching = data.pitching?.length > 0;
 
     if (!hasHitting && !hasPitching) {
-      tabEl.innerHTML = `<div class="no-games">No games found for ${currentSport==='S'?'Spring Training':'MLB'} 2026</div>`;
+      tabEl.innerHTML = `<div class="no-games">No games found for ${currentSport==='S'?'Spring Training':'MLB'} ${new Date().getFullYear()}</div>`;
     } else {
       const showSwitch = hasHitting && hasPitching;
       const defaultTab = (isPitcher && hasPitching) ? 'pitching' : 'hitting';
@@ -774,7 +774,7 @@ async function loadSeasonTab(playerId) {
     const { hitting, pitching } = data;
     let html = '';
     if (hitting && Object.keys(hitting).length && hitting.gamesPlayed > 0) {
-      html += `<div class="season-section"><h3>Hitting — 2026 Regular Season</h3>
+      html += `<div class="season-section"><h3>Hitting — ${new Date().getFullYear()} Regular Season</h3>
         <table><thead><tr><th>G</th><th>AB</th><th>H</th><th>HR</th><th>RBI</th><th>R</th><th>SB</th><th>BB</th><th>K</th><th>AVG</th><th>OBP</th><th>SLG</th><th>OPS</th></tr></thead>
         <tbody><tr>
           <td>${hitting.gamesPlayed}</td><td>${hitting.ab}</td><td>${hitting.hits}</td><td>${hitting.hr}</td>
@@ -783,7 +783,7 @@ async function loadSeasonTab(playerId) {
         </tr></tbody></table></div>`;
     }
     if (pitching && Object.keys(pitching).length && pitching.gamesPlayed > 0) {
-      html += `<div class="season-section"><h3>Pitching — 2026 Regular Season</h3>
+      html += `<div class="season-section"><h3>Pitching — ${new Date().getFullYear()} Regular Season</h3>
         <table><thead><tr><th>G</th><th>GS</th><th>W</th><th>L</th><th>ERA</th><th>IP</th><th>K</th><th>BB</th><th>WHIP</th><th>SV</th><th>HLD</th></tr></thead>
         <tbody><tr>
           <td>${pitching.gamesPlayed}</td><td>${pitching.gamesStarted}</td><td>${pitching.w}</td><td>${pitching.l}</td>
@@ -1751,7 +1751,8 @@ async function showGameHub() {
     return bDate.localeCompare(aDate);
   });
   const sportLabel = currentSport === 'S' ? 'Spring Training' : 'MLB';
-  let html = `<div class="hub-title">📋 Game Log Hub <span style="font-size:0.75rem;font-weight:400;color:#555;margin-left:8px">${sportLabel} 2026</span></div>`;
+  const currentYear = new Date().getFullYear();
+  let html = `<div class="hub-title">📋 Game Log Hub <span style="font-size:0.75rem;font-weight:400;color:#555;margin-left:8px">${sportLabel} ${currentYear}</span></div>`;
   for (const { player, data } of results) {
     const pos = player.position || '';
     const hasHitting = data?.hitting?.length > 0;
@@ -1765,7 +1766,7 @@ async function showGameHub() {
         </div>
       </div>`;
     if (!hasHitting && !hasPitching) {
-      html += `<div class="hub-no-games">No games found for ${sportLabel} 2026</div>`;
+      html += `<div class="hub-no-games">No games found for ${sportLabel} ${currentYear}</div>`;
     } else {
       if (hasHitting) html += `<div style="overflow-x:auto">${buildHittingTable(data.hitting.slice(0, 5))}</div>`;
       if (hasPitching) html += `<div style="overflow-x:auto">${buildPitchingTable(data.pitching.slice(0, 5))}</div>`;
