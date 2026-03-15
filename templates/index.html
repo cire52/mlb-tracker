@@ -925,7 +925,7 @@ function buildStatcastTable(sc, player, year = 2025, winnerKeys = null) {
     if (hit) html += `<div class="pct-section"><div class="pct-section-hdr">Hitting</div>${hit}</div>`;
   }
 
-  html += `<div class="pct-source">via <a href="https://baseballsavant.mlb.com" target="_blank" rel="noopener" style="color:#444">Baseball Savant</a></div></div>`;
+  html += `<div class="pct-source">via <a href="https://baseballsavant.mlb.com/savant-player/${player.id}" target="_blank" rel="noopener" style="color:#444">Baseball Savant</a></div></div>`;
   return html;
 }
 
