@@ -1718,14 +1718,44 @@ function closeImport() {
   document.getElementById('importResults').style.display = 'none';
   document.getElementById('importResults').innerHTML = '';
   document.getElementById('importFooter').style.display = 'none';
+  document.getElementById('csvFileName').textContent = '';
+  document.getElementById('csvFileInput').value = '';
+  window._csvNames = [];
   importResults = [];
 }
 
 function switchImportTab(tab) {
   document.getElementById('importPanelUrl').style.display = tab === 'url' ? '' : 'none';
+  document.getElementById('importPanelCsv').style.display = tab === 'csv' ? '' : 'none';
   document.getElementById('importPanelNames').style.display = tab === 'names' ? '' : 'none';
   document.getElementById('importTabUrl').classList.toggle('active', tab === 'url');
+  document.getElementById('importTabCsv').classList.toggle('active', tab === 'csv');
   document.getElementById('importTabNames').classList.toggle('active', tab === 'names');
+}
+
+function handleCsvUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  document.getElementById('csvFileName').textContent = '✓ ' + file.name;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const lines = e.target.result.split('\n');
+    const names = [];
+    for (const line of lines) {
+      const cols = line.split(',').map(c => c.replace(/^"|"$/g, '').trim());
+      // Skip section headers (Hitting/Pitching), column headers, and empty rows
+      if (cols.length < 3) continue;
+      if (cols[2] === 'Player' || cols[2] === '' || cols[1] === 'Hitting' || cols[1] === 'Pitching') continue;
+      if (cols[0].startsWith('*') && cols[2]) names.push(cols[2]);
+    }
+    document.getElementById('importNamesInput').value = names.join('\n');
+    // Auto-switch to show the names (but keep CSV tab active visually)
+    document.getElementById('importPanelNames').style.display = 'none';
+    // Store parsed names for runFantraxImport to use
+    window._csvNames = names;
+    document.getElementById('csvFileName').textContent = `✓ ${file.name} — ${names.length} players found`;
+  };
+  reader.readAsText(file);
 }
 
 async function runFantraxImport() {
@@ -1741,12 +1771,14 @@ async function runFantraxImport() {
   let body;
   if (urlVal) {
     body = {url: urlVal};
+  } else if (window._csvNames && window._csvNames.length) {
+    body = {names: window._csvNames};
   } else if (namesVal) {
     const names = namesVal.split('\n').map(n => n.trim()).filter(Boolean);
     if (!names.length) { resultsDiv.innerHTML = '<div class="loading" style="color:#c8102e">Please enter player names.</div>'; return; }
     body = {names};
   } else {
-    resultsDiv.innerHTML = '<div class="loading" style="color:#c8102e">Please enter a URL or player names.</div>';
+    resultsDiv.innerHTML = '<div class="loading" style="color:#c8102e">Please upload a CSV or enter player names.</div>';
     return;
   }
 
@@ -1830,14 +1862,25 @@ async function addImportSelected() {
         <button onclick="closeImport()" style="background:none;border:none;color:#666;font-size:1.1rem;cursor:pointer;padding:2px 8px;line-height:1">✕</button>
       </div>
       <div style="display:flex;gap:0;border-bottom:1px solid #2a2f3e;margin:0 -16px;padding:0 4px">
-        <button class="import-tab active" id="importTabUrl" onclick="switchImportTab('url')">Team URL</button>
+        <button class="import-tab" id="importTabUrl" onclick="switchImportTab('url')">Team URL</button>
+        <button class="import-tab active" id="importTabCsv" onclick="switchImportTab('csv')">Upload CSV</button>
         <button class="import-tab" id="importTabNames" onclick="switchImportTab('names')">Paste Names</button>
       </div>
     </div>
     <div style="padding:14px 16px 10px">
-      <div id="importPanelUrl">
+      <div id="importPanelUrl" style="display:none">
         <input class="import-input" id="importUrlInput" type="text" placeholder="https://www.fantrax.com/fantasy/league/.../players;teamId=...">
-        <div style="font-size:0.74rem;color:#555;margin-top:5px">Paste your Fantrax team URL. Works for public leagues; private leagues require the Paste Names tab.</div>
+        <div style="font-size:0.74rem;color:#555;margin-top:5px">Paste your Fantrax team URL. Works for public leagues; private leagues require the Upload CSV tab.</div>
+      </div>
+      <div id="importPanelCsv">
+        <label style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:24px;border:2px dashed #3a3f4e;border-radius:8px;cursor:pointer;background:#0f1117" id="csvDropZone">
+          <span style="font-size:1.4rem">📄</span>
+          <span style="font-size:0.88rem;color:#aaa">Click to upload Fantrax CSV</span>
+          <span style="font-size:0.74rem;color:#555">In Fantrax: Roster page → Export → Download CSV</span>
+          <input type="file" accept=".csv" id="csvFileInput" style="display:none" onchange="handleCsvUpload(this)">
+        </label>
+        <script>document.getElementById('csvDropZone').onclick = () => document.getElementById('csvFileInput').click();</script>
+        <div id="csvFileName" style="font-size:0.78rem;color:#4caf7d;margin-top:6px;text-align:center"></div>
       </div>
       <div id="importPanelNames" style="display:none">
         <textarea class="import-input" id="importNamesInput" rows="6" placeholder="Aaron Judge&#10;Shohei Ohtani&#10;Mookie Betts&#10;...one player per line"></textarea>
