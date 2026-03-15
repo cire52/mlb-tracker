@@ -892,7 +892,7 @@ def import_fantrax_url(url):
                 players.append({"name": name, "pos": pos, "team": team})
 
         if not players:
-            return {"error": "No players found in response. The league may be private or the URL format may have changed."}
+            return {"error": f"No players found. Response keys: {list(data.keys())}. First item sample: {str(items[0])[:200] if items else 'no items'}"}
 
         return {"players": players}
     except requests.HTTPError as e:
