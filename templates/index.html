@@ -1427,104 +1427,18 @@ async function renderStatcastComparison(players) {
   if (loadingEl) loadingEl.style.display = 'none';
   if (!tableEl) return;
 
-  const isPitcher = p => ['SP','RP','P'].includes(p.position||'');
-  const fmt3 = v => v ? String(parseFloat(v).toFixed(3)).replace(/^0\./,'.') : null;
-  const fmt1 = v => v ? parseFloat(v).toFixed(1) : null;
-  const fmtPct = v => { if (!v) return null; const n = parseFloat(v); if (isNaN(n)) return null; return (n < 2 ? (n*100).toFixed(1) : n.toFixed(1)) + '%'; };
-  const fmtMph = v => v ? parseFloat(v).toFixed(1) + ' mph' : null;
-  const fmtFts = v => v ? parseFloat(v).toFixed(1) + ' ft/s' : null;
-
-  function pctBadge(pct) {
-    if (pct == null) return '';
-    const n = Math.max(0, Math.min(100, pct));
-    var color = n>=84?'#7f1d1d':n>=67?'#c8102e':n>=50?'#d96060':n>=34?'#5080c8':n>=17?'#1d4ed8':'#1e3a8a';
-    return '<span style="display:inline-block;background:' + color + ';color:#fff;border-radius:3px;padding:1px 5px;font-size:0.68rem;font-weight:700;margin-left:5px">' + n + '</span>';
-  }
-
-  const hCols = players.map(function(p, i) {
-    return '<th class="comp-player-th">'
-      + '<img src="' + esc(p.headshotUrl||'') + '" onerror="this.src=\'' + GENERIC_HEADSHOT + '\'" alt="">'
-      + '<div class="comp-player-name">' + esc(p.fullName) + '</div>'
-      + '<div class="comp-player-meta">' + esc(p.position) + ' \xb7 ' + esc(p.currentTeamAbbrev||'') + '</div>'
-      + '</th>';
+  const cols = players.map(function(p, i) {
+    const sc = results[i];
+    const header = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid #2a2f3e">'
+      + '<img src="' + esc(p.headshotUrl||'') + '" onerror="this.src=\'' + GENERIC_HEADSHOT + '\'" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid #c8102e;flex-shrink:0">'
+      + '<div><div style="font-size:0.88rem;font-weight:700">' + esc(p.fullName) + '</div>'
+      + '<div style="font-size:0.74rem;color:#888">' + esc(p.position) + ' \xb7 ' + esc(p.currentTeamAbbrev||'') + '</div></div>'
+      + '</div>';
+    const body = sc ? buildStatcastTable(sc, p, year) : '<div class="sc-empty">No Statcast data available.</div>';
+    return '<div style="flex:1;min-width:260px">' + header + body + '</div>';
   }).join('');
 
-  // Build a comparison row: vals & pcts arrays (one per player), higherBetter
-  function buildRow(label, vals, pcts, higherBetter) {
-    if (higherBetter === undefined) higherBetter = true;
-    var hasAny = vals.some(function(v){ return v !== null && v !== undefined; });
-    if (!hasAny) return '';
-    // Determine best via percentile, else raw numeric
-    var scores = players.map(function(p, i) {
-      if (pcts[i] != null) return pcts[i];
-      var n = vals[i] ? parseFloat(vals[i]) : null;
-      if (n === null || isNaN(n)) return null;
-      return higherBetter ? n : -n;
-    });
-    var validScores = scores.filter(function(s){ return s !== null; });
-    var maxScore = validScores.length > 1 ? Math.max.apply(null, validScores) : null;
-    var cells = players.map(function(p, i) {
-      var v = vals[i];
-      var pct = pcts[i];
-      var isBest = maxScore !== null && scores[i] === maxScore && validScores.length > 1;
-      return '<td class="comp-cell" ' + (isBest ? 'style="font-weight:700;color:#e0e0e0"' : '') + '>'
-        + (v !== null && v !== undefined ? v : '<span style="color:#444">\u2014</span>')
-        + pctBadge(pct)
-        + '</td>';
-    }).join('');
-    return '<tr><td class="comp-stat-label">' + label + '</td>' + cells + '</tr>';
-  }
-
-  var nc = players.length + 1;
-  var rows = '';
-
-  // Expected stats
-  var expRows = [
-    buildRow('xwOBA', players.map(function(p,i){ return results[i] ? fmt3(results[i].xwoba) : null; }), players.map(function(p,i){ return results[i] && results[i].percentiles ? (results[i].percentiles.xwoba||null) : null; })),
-    buildRow('xBA',   players.map(function(p,i){ return results[i] ? fmt3(results[i].xba)   : null; }), players.map(function(p,i){ return results[i] && results[i].percentiles ? (results[i].percentiles.xba||null)   : null; })),
-  ].filter(Boolean).join('');
-  if (expRows) rows += '<tr><td class="comp-section-label" colspan="' + nc + '">Expected Stats</td></tr>' + expRows;
-
-  var hasHitters = players.some(function(p,i){ return !isPitcher(p) && results[i]; });
-  var hasPitchers = players.some(function(p,i){ return isPitcher(p) && results[i]; });
-
-  if (hasHitters) {
-    var hitRows = [
-      buildRow('xSLG',        players.map(function(p,i){ return (!isPitcher(p)&&results[i]) ? fmt3(results[i].xslg)              : null; }), players.map(function(p,i){ return results[i]&&results[i].percentiles?(results[i].percentiles.xslg||null):null; })),
-      buildRow('Avg Exit Velo', players.map(function(p,i){ return (!isPitcher(p)&&results[i]) ? fmtMph(results[i].avg_ev)         : null; }), players.map(function(p,i){ return results[i]&&results[i].percentiles?(results[i].percentiles.exit_velocity||null):null; })),
-      buildRow('Hard-Hit %',  players.map(function(p,i){ return (!isPitcher(p)&&results[i]) ? fmtPct(results[i].hard_hit_pct)     : null; }), players.map(function(p,i){ return results[i]&&results[i].percentiles?(results[i].percentiles.hard_hit_percent||null):null; })),
-      buildRow('Barrel %',    players.map(function(p,i){ return (!isPitcher(p)&&results[i]) ? fmtPct(results[i].barrel_pct)       : null; }), players.map(function(p,i){ return results[i]&&results[i].percentiles?(results[i].percentiles.brl_percent||null):null; })),
-      buildRow('K %',         players.map(function(p,i){ return (!isPitcher(p)&&results[i]) ? fmtPct(results[i].k_pct)            : null; }), players.map(function(p,i){ return results[i]&&results[i].percentiles?(results[i].percentiles.k_percent||null):null; }), false),
-      buildRow('BB %',        players.map(function(p,i){ return (!isPitcher(p)&&results[i]) ? fmtPct(results[i].bb_pct)           : null; }), players.map(function(p,i){ return results[i]&&results[i].percentiles?(results[i].percentiles.bb_percent||null):null; })),
-      buildRow('Whiff %',     players.map(function(p,i){ return (!isPitcher(p)&&results[i]) ? fmtPct(results[i].whiff_pct)        : null; }), players.map(function(p,i){ return results[i]&&results[i].percentiles?(results[i].percentiles.whiff_percent||null):null; }), false),
-      buildRow('Chase %',     players.map(function(p,i){ return (!isPitcher(p)&&results[i]) ? fmtPct(results[i].chase_pct)        : null; }), players.map(function(p,i){ return results[i]&&results[i].percentiles?(results[i].percentiles.chase_percent||null):null; }), false),
-      buildRow('Sprint Speed',players.map(function(p,i){ return (!isPitcher(p)&&results[i]) ? fmtFts(results[i].sprint_speed)     : null; }), players.map(function(p,i){ return results[i]&&results[i].percentiles?(results[i].percentiles.sprint_speed||null):null; })),
-      buildRow('Bat Speed',   players.map(function(p,i){ return (!isPitcher(p)&&results[i]) ? fmtMph(results[i].bat_speed)        : null; }), players.map(function(p,i){ return results[i]&&results[i].percentiles?(results[i].percentiles.bat_speed||null):null; })),
-    ].filter(Boolean).join('');
-    if (hitRows) rows += '<tr><td class="comp-section-label" colspan="' + nc + '">Hitting</td></tr>' + hitRows;
-  }
-
-  if (hasPitchers) {
-    var pitRows = [
-      buildRow('xERA',          players.map(function(p,i){ return (isPitcher(p)&&results[i]) ? (results[i].xera||null)                  : null; }), players.map(function(p,i){ return results[i]&&results[i].percentiles?(results[i].percentiles.xera||null):null; }), false),
-      buildRow('FB Velo',       players.map(function(p,i){ return (isPitcher(p)&&results[i]) ? fmtMph(results[i].fb_velo)               : null; }), players.map(function(p,i){ return results[i]&&results[i].percentiles?(results[i].percentiles.fb_velocity||null):null; })),
-      buildRow('Avg EV Against',players.map(function(p,i){ return (isPitcher(p)&&results[i]) ? fmtMph(results[i].avg_ev_against)        : null; }), players.map(function(p,i){ return results[i]&&results[i].percentiles?(results[i].percentiles.exit_velocity||null):null; }), false),
-      buildRow('Barrel %',      players.map(function(p,i){ return (isPitcher(p)&&results[i]) ? fmtPct(results[i].barrel_pct_against)    : null; }), players.map(function(p,i){ return results[i]&&results[i].percentiles?(results[i].percentiles.brl_percent||null):null; }), false),
-      buildRow('Hard-Hit %',    players.map(function(p,i){ return (isPitcher(p)&&results[i]) ? fmtPct(results[i].hard_hit_pct_against)  : null; }), players.map(function(p,i){ return results[i]&&results[i].percentiles?(results[i].percentiles.hard_hit_percent||null):null; }), false),
-      buildRow('Chase %',       players.map(function(p,i){ return (isPitcher(p)&&results[i]) ? fmtPct(results[i].chase_pct)             : null; }), players.map(function(p,i){ return results[i]&&results[i].percentiles?(results[i].percentiles.chase_percent||null):null; })),
-      buildRow('Whiff %',       players.map(function(p,i){ return (isPitcher(p)&&results[i]) ? fmtPct(results[i].whiff_pct)             : null; }), players.map(function(p,i){ return results[i]&&results[i].percentiles?(results[i].percentiles.whiff_percent||null):null; })),
-      buildRow('K %',           players.map(function(p,i){ return (isPitcher(p)&&results[i]) ? fmtPct(results[i].k_pct)                : null; }), players.map(function(p,i){ return results[i]&&results[i].percentiles?(results[i].percentiles.k_percent||null):null; })),
-      buildRow('BB %',          players.map(function(p,i){ return (isPitcher(p)&&results[i]) ? fmtPct(results[i].bb_pct)               : null; }), players.map(function(p,i){ return results[i]&&results[i].percentiles?(results[i].percentiles.bb_percent||null):null; }), false),
-    ].filter(Boolean).join('');
-    if (pitRows) rows += '<tr><td class="comp-section-label" colspan="' + nc + '">Pitching</td></tr>' + pitRows;
-  }
-
-  if (!rows) {
-    tableEl.innerHTML = '<div class="sc-empty" style="padding:40px;text-align:center">No Statcast data available for these players yet.</div>';
-    return;
-  }
-  tableEl.innerHTML = '<table class="comp-table"><thead><tr><th></th>' + hCols + '</tr></thead><tbody>' + rows + '</tbody></table>'
-    + '<div style="font-size:0.71rem;color:#444;padding:10px 2px;text-align:right">Colored badge = MLB percentile rank \xb7 Bold = better value \xb7 via Baseball Savant (' + year + ')</div>';
+  tableEl.innerHTML = '<div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start">' + cols + '</div>';
 }
 
 /* ── Export CSV ── */
