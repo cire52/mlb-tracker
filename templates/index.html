@@ -1899,12 +1899,22 @@ async function addImportSelected() {
   const fantasyTeam = document.getElementById('importTeamSelect').value || 'Main';
   const toAdd = importResults.filter(p => p.checked && p.mlb);
   if (!toAdd.length) return;
-  await Promise.all(toAdd.map(item =>
-    fetch('/api/track', {method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({...item.mlb, uid: UID, fantasy_team: fantasyTeam})})
-  ));
+  const addBtn = document.querySelector('#importFooter button[onclick="addImportSelected()"]');
+  if (addBtn) { addBtn.disabled = true; addBtn.textContent = `Adding… (0/${toAdd.length})`; }
+  let done = 0, failed = 0;
+  // Sequential (not parallel) to avoid read-modify-write race condition on the save file
+  for (const item of toAdd) {
+    try {
+      const res = await fetch('/api/track', {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({...item.mlb, uid: UID, fantasy_team: fantasyTeam})});
+      if (!res.ok) failed++;
+    } catch(e) { failed++; }
+    done++;
+    if (addBtn) addBtn.textContent = `Adding… (${done}/${toAdd.length})`;
+  }
   closeImport();
   await loadTracked();
+  if (failed) alert(`${failed} player(s) failed to save. Try importing again.`);
 }
 </script>
 

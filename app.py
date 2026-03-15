@@ -1,5 +1,5 @@
 from flask import Flask, jsonify, request, render_template
-import json, os, concurrent.futures
+import json, os, concurrent.futures, threading
 from mlb_api import (search_players, get_game_log, get_player_info, clear_cache,
                      get_season_totals, get_player_transactions, get_xstats, get_pitch_mix,
                      get_statcast, get_nbc_news, get_career_stats, get_minor_league_stats,
@@ -9,6 +9,7 @@ app = Flask(__name__)
 # Use /tmp for writable storage on cloud platforms, fallback to local
 TRACKED_FILE = os.path.join(os.environ.get("STORAGE_DIR", "."), "tracked_players.json")
 BACKUP_FILE = TRACKED_FILE + ".bak"
+_save_lock = threading.Lock()  # prevents race conditions between gthread workers
 
 
 def load_tracked(uid=None):
@@ -41,9 +42,10 @@ def _save_all(data):
 
 
 def save_tracked(uid, players):
-    data = load_tracked()
-    data[uid] = players
-    _save_all(data)
+    with _save_lock:
+        data = load_tracked()
+        data[uid] = players
+        _save_all(data)
 
 
 @app.route("/")
