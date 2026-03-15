@@ -397,6 +397,7 @@ let currentSport = 'S';
 let currentHub = null;
 let activeTeam = localStorage.getItem('mlb_active_team') || '__all__';
 let userTeams = JSON.parse(localStorage.getItem('mlb_teams') || '["Main"]');
+let defaultTeam = localStorage.getItem('mlb_default_team') || 'Main';
 
 function saveUserTeams() {
   localStorage.setItem('mlb_teams', JSON.stringify(userTeams));
@@ -1477,7 +1478,7 @@ async function doSearch(q) {
 }
 
 async function addPlayer(p) {
-  const fantasyTeam = (activeTeam !== '__all__') ? activeTeam : 'Main';
+  const fantasyTeam = (activeTeam !== '__all__') ? activeTeam : defaultTeam;
   await fetch('/api/track', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...p, uid:UID, fantasy_team: fantasyTeam})});
   document.getElementById('searchInput').value = '';
   document.getElementById('searchResults').style.display = 'none';
@@ -1509,9 +1510,11 @@ function renderTeamBar() {
   window._teamsList = teams;
   let html = `<span class="team-tab ${activeTeam === '__all__' ? 'active' : ''}" onclick="setActiveTeam('__all__')"><span class="t-name">All</span></span>`;
   teams.forEach((t, i) => {
-    html += `<span class="team-tab ${activeTeam === t ? 'active' : ''}" onclick="setActiveTeam(_teamsList[${i}])" ondblclick="renameTeam(${i})">
+    const isDefault = (t === defaultTeam);
+    html += `<span class="team-tab ${activeTeam === t ? 'active' : ''}" onclick="setActiveTeam(_teamsList[${i}])">
       <span class="t-name">${esc(t)}</span>
-      <span class="team-x" onclick="event.stopPropagation();deleteTeam(${i})" title="Delete team">✕</span>
+      <span class="team-x" onclick="event.stopPropagation();renameTeam(${i})" title="Rename team">✎</span>
+      ${isDefault ? '' : `<span class="team-x" onclick="event.stopPropagation();deleteTeam(${i})" title="Delete team">✕</span>`}
     </span>`;
   });
   html += `<span class="team-tab-add" onclick="createTeam()">+ Team</span>`;
@@ -1547,9 +1550,11 @@ async function renameTeam(i) {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({old_name: old, new_name: trimmed})
   });
-  trackedPlayers.forEach(p => { if ((p.fantasy_team || 'Main') === old) p.fantasy_team = trimmed; });
+  trackedPlayers.forEach(p => { if ((p.fantasy_team || defaultTeam) === old) p.fantasy_team = trimmed; });
+  if (old === defaultTeam) { defaultTeam = trimmed; localStorage.setItem('mlb_default_team', trimmed); }
   const idx = userTeams.indexOf(old);
-  if (idx !== -1) { userTeams[idx] = trimmed; saveUserTeams(); }
+  if (idx !== -1) { userTeams[idx] = trimmed; } else { userTeams.push(trimmed); }
+  saveUserTeams();
   if (activeTeam === old) { activeTeam = trimmed; localStorage.setItem('mlb_active_team', trimmed); }
   renderTeamBar();
   renderPlayerList();
