@@ -1287,7 +1287,7 @@ async function loadVideosTab(playerId) {
   tabEl.dataset.loaded = '1';
   tabEl.innerHTML = '<div class="loading">Loading videos…</div>';
   try {
-    const res = await fetch(`/api/videos/${playerId}?season=2025`);
+    const res = await fetch(`/api/videos/${playerId}`);
     const videos = await res.json();
     _videoList = videos;
     if (!videos.length) {

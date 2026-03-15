@@ -260,8 +260,9 @@ def import_fantrax():
 
 @app.route("/api/videos/<int:player_id>")
 def player_videos(player_id):
-    season = int(request.args.get("season", 2025))
-    return jsonify(get_player_videos(player_id, season=season))
+    season = request.args.get("season")
+    kwargs = {"season": int(season)} if season else {}
+    return jsonify(get_player_videos(player_id, **kwargs))
 
 
 @app.route("/api/refresh", methods=["POST"])

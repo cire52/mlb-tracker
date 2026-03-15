@@ -993,33 +993,43 @@ def import_fantrax_url(url):
         return {"error": f"Failed to fetch roster: {str(e)}"}
 
 
-def get_player_videos(player_id, season=2025, limit=5):
+def get_player_videos(player_id, season=None, limit=5):
     """Return up to `limit` recent MLB highlight videos for a player, cached 1h."""
+    if season is None:
+        season = datetime.date.today().year
+
     now = time.time()
-    if player_id in _video_cache:
-        videos, ts = _video_cache[player_id]
+    cache_key = (player_id, season)
+    if cache_key in _video_cache:
+        videos, ts = _video_cache[cache_key]
         if now - ts < VIDEO_CACHE_TTL:
             return videos
 
     pid_str = str(player_id)
 
-    # Get recent game PKs from both hitting and pitching game logs
+    # Get recent game PKs — try spring training + regular season for current year,
+    # fall back to prior year regular season if nothing found
     game_pks = []
-    try:
+    def _collect_pks(yr, game_type):
         for group in ("hitting", "pitching"):
-            data = _get(f"{BASE}/people/{player_id}/stats",
-                        {"stats": "gameLog", "group": group, "season": season,
-                         "sportId": 1, "gameType": "R"})
-            splits = data.get("stats", [{}])[0].get("splits", [])
-            for split in splits:
-                gp = split.get("game", {}).get("gamePk")
-                if gp and gp not in game_pks:
-                    game_pks.append(gp)
-    except Exception:
-        pass
+            try:
+                data = _get(f"{BASE}/people/{player_id}/stats",
+                            {"stats": "gameLog", "group": group, "season": yr,
+                             "sportId": 1, "gameType": game_type})
+                for split in data.get("stats", [{}])[0].get("splits", []):
+                    gp = split.get("game", {}).get("gamePk")
+                    if gp and gp not in game_pks:
+                        game_pks.append(gp)
+            except Exception:
+                pass
+
+    _collect_pks(season, "S")
+    _collect_pks(season, "R")
+    if not game_pks:
+        _collect_pks(season - 1, "R")
 
     if not game_pks:
-        _video_cache[player_id] = ([], now)
+        _video_cache[cache_key] = ([], now)
         return []
 
     # Sort descending (most recent first), check up to 20 games
@@ -1036,8 +1046,14 @@ def get_player_videos(player_id, season=2025, limit=5):
             if not r.ok:
                 return []
             data = r.json()
-            items = (data.get("highlights", {}).get("highlights", {}).get("items") or
-                     data.get("highlights", {}).get("items") or [])
+            # Try several known response shapes
+            hl = data.get("highlights") or {}
+            items = (
+                hl.get("highlights", {}).get("items") or
+                data.get("media", {}).get("highlights", {}).get("highlights", {}).get("items") or
+                hl.get("items") or
+                []
+            )
             results = []
             for item in items:
                 # Filter to this player's highlights
@@ -1082,7 +1098,7 @@ def get_player_videos(player_id, season=2025, limit=5):
     videos.sort(key=lambda v: v.get("date", ""), reverse=True)
     videos = videos[:limit]
 
-    _video_cache[player_id] = (videos, now)
+    _video_cache[cache_key] = (videos, now)
     return videos
 
 
