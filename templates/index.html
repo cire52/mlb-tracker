@@ -2206,15 +2206,29 @@ function renderAuthArea() {
   const mobEl = document.getElementById('mobAuthArea');
   if (currentUser) {
     const initial = currentUser.username[0].toUpperCase();
+    const hasEmail = currentUser.email;
+    const emailTip = hasEmail ? `Email: ${esc(currentUser.email)}` : 'No email linked';
+    const linkBtn = hasEmail
+      ? `<button class="hdr-btn" onclick="openLinkEmail()" style="padding:4px 9px;font-size:0.72rem" title="${emailTip}">✉ ${esc(currentUser.email)}</button>`
+      : `<button class="hdr-btn" onclick="openLinkEmail()" style="padding:4px 9px;font-size:0.72rem;border-color:#f0c040;color:#f0c040" title="Link an email for password recovery">⚠ Link Email</button>`;
     const desktopHtml = `<div class="auth-user">
       <div class="auth-avatar">${initial}</div>
       <span class="auth-username">${esc(currentUser.username)}</span>
+      ${linkBtn}
       <button class="hdr-btn" onclick="logOut()" style="padding:4px 9px;font-size:0.72rem">Sign Out</button>
     </div>`;
-    const mobileHtml = `<div style="display:flex;align-items:center;gap:8px;padding:4px 0">
-      <div class="auth-avatar">${initial}</div>
-      <span style="font-size:0.85rem;color:#ccc;font-weight:600">${esc(currentUser.username)}</span>
-      <button class="mob-footer-btn" style="flex:none;padding:6px 12px" onclick="logOut()">Sign Out</button>
+    const mobLinkBtn = hasEmail
+      ? `<button class="mob-footer-btn" style="flex:1;font-size:0.75rem" onclick="openLinkEmail()">✉ ${esc(currentUser.email)}</button>`
+      : `<button class="mob-footer-btn" style="flex:1;border-color:#f0c040;color:#f0c040" onclick="openLinkEmail()">⚠ Link Email</button>`;
+    const mobileHtml = `<div style="display:flex;flex-direction:column;gap:6px;padding:4px 0">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="auth-avatar">${initial}</div>
+        <span style="font-size:0.85rem;color:#ccc;font-weight:600">${esc(currentUser.username)}</span>
+      </div>
+      <div style="display:flex;gap:6px">
+        ${mobLinkBtn}
+        <button class="mob-footer-btn" style="flex:none;padding:6px 12px" onclick="logOut()">Sign Out</button>
+      </div>
     </div>`;
     if (el) el.innerHTML = desktopHtml;
     if (mobEl) mobEl.innerHTML = mobileHtml;
@@ -2222,6 +2236,35 @@ function renderAuthArea() {
     if (el) el.innerHTML = `<button class="hdr-btn" style="border-color:#c8102e;color:#c8102e;font-weight:700" onclick="openAuth()">Sign In</button>`;
     if (mobEl) mobEl.innerHTML = `<button class="mob-footer-btn" style="width:100%;border-color:#c8102e;color:#c8102e;font-weight:700" onclick="openAuth()">Sign In / Create Account</button>`;
   }
+}
+
+function openLinkEmail() {
+  document.getElementById('linkEmailOverlay').style.display = 'flex';
+  document.getElementById('linkEmailInput').value = currentUser.email || '';
+  document.getElementById('linkEmailError').textContent = '';
+}
+
+function closeLinkEmail() {
+  document.getElementById('linkEmailOverlay').style.display = 'none';
+}
+
+async function submitLinkEmail() {
+  const errEl = document.getElementById('linkEmailError');
+  errEl.style.color = '#ff6b6b';
+  errEl.textContent = '';
+  const email = document.getElementById('linkEmailInput').value.trim();
+  try {
+    const res = await fetch('/api/auth/update-email', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email})
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) { errEl.textContent = data.error || 'Something went wrong.'; return; }
+    currentUser.email = email;
+    closeLinkEmail();
+    renderAuthArea();
+    errEl.textContent = '';
+  } catch(e) { errEl.textContent = 'Network error. Please try again.'; }
 }
 
 function getUID() {
@@ -2415,6 +2458,25 @@ initAuth();
       <div id="authError" class="auth-error"></div>
     </div>
     <div class="auth-modal-footer">Your roster is stored securely on the server</div>
+  </div>
+</div>
+
+<!-- Link Email Overlay -->
+<div id="linkEmailOverlay" class="auth-modal-overlay" style="display:none" onclick="if(event.target===this)closeLinkEmail()">
+  <div class="auth-modal">
+    <div class="auth-modal-header">
+      <h2>Link Email</h2>
+      <p>Add an email address to enable password recovery</p>
+    </div>
+    <div class="auth-modal-body">
+      <div class="auth-field">
+        <label>Email Address</label>
+        <input id="linkEmailInput" type="email" placeholder="you@example.com" autocomplete="email" onkeydown="if(event.key==='Enter')submitLinkEmail()">
+      </div>
+      <button class="auth-submit" style="margin-top:14px" onclick="submitLinkEmail()">Save Email</button>
+      <div id="linkEmailError" class="auth-error"></div>
+    </div>
+    <div class="auth-modal-footer"><a href="#" onclick="closeLinkEmail();return false" style="color:#555;text-decoration:none">Cancel</a></div>
   </div>
 </div>
 </body>
