@@ -17,6 +17,8 @@ SAVANT_CACHE_TTL = 21600  # 6 hours
 _savant_xstats_cache = {}   # {"batter"|"pitcher": (indexed_dict, ts)}
 _savant_pitcharsenal_cache = {}  # {year: (indexed_dict, ts)}
 _savant_leaderboard_cache = {}  # {"batter"|"pitcher": (indexed_dict, ts)}
+_bat_tracking_cache = {}        # {year: (indexed_dict, ts)}
+_sprint_speed_cache = {}        # {year: (indexed_dict, ts)}
 _savant_percentile_cache = {}  # {"batter"|"pitcher": (indexed_dict, ts)}
 _nbc_playerurl_cache = {}  # {player_id: (url, ts)}
 _nbc_news_cache = {}       # {player_id: (news_list, ts)}
@@ -435,6 +437,44 @@ def _load_savant_leaderboard(type_, year=2025):
         return {}
 
 
+def _load_bat_tracking(year=2025):
+    """Load bat-tracking CSV (bat speed + whiff rate), cached 6h."""
+    now = time.time()
+    if year in _bat_tracking_cache:
+        data, ts = _bat_tracking_cache[year]
+        if now - ts < SAVANT_CACHE_TTL:
+            return data
+    url = f"https://baseballsavant.mlb.com/leaderboard/bat-tracking?year={year}&min=0&csv=true"
+    try:
+        r = requests.get(url, headers=SAVANT_HEADERS, timeout=30)
+        r.raise_for_status()
+        reader = csv.DictReader(io.StringIO(r.content.decode('utf-8-sig')))
+        indexed = {row["id"].strip(): row for row in reader if row.get("id", "").strip()}
+        _bat_tracking_cache[year] = (indexed, now)
+        return indexed
+    except Exception:
+        return {}
+
+
+def _load_sprint_speed(year=2025):
+    """Load sprint speed leaderboard CSV, cached 6h."""
+    now = time.time()
+    if year in _sprint_speed_cache:
+        data, ts = _sprint_speed_cache[year]
+        if now - ts < SAVANT_CACHE_TTL:
+            return data
+    url = f"https://baseballsavant.mlb.com/leaderboard/sprint_speed?year={year}&position=&team=&min=0&csv=true"
+    try:
+        r = requests.get(url, headers=SAVANT_HEADERS, timeout=30)
+        r.raise_for_status()
+        reader = csv.DictReader(io.StringIO(r.content.decode('utf-8-sig')))
+        indexed = {row["player_id"].strip(): row for row in reader if row.get("player_id", "").strip()}
+        _sprint_speed_cache[year] = (indexed, now)
+        return indexed
+    except Exception:
+        return {}
+
+
 def get_statcast(player_id, year=2025):
     """Return comprehensive Statcast data combining leaderboard + xStats."""
     pid_str = str(player_id)
@@ -563,6 +603,26 @@ def get_statcast(player_id, year=2025):
                     result["whiff_pct"] = f"{wtd/total:.1f}"
         except Exception:
             pass
+
+    # Bat tracking: bat speed + batter whiff% (not in standard leaderboard CSV)
+    if player_type == "batter":
+        try:
+            bt_row = _load_bat_tracking(year).get(pid_str)
+            if bt_row:
+                if not result.get("bat_speed") and bt_row.get("avg_bat_speed"):
+                    result["bat_speed"] = bt_row["avg_bat_speed"]
+                if not result.get("whiff_pct") and bt_row.get("whiff_per_swing"):
+                    result["whiff_pct"] = f"{float(bt_row['whiff_per_swing']) * 100:.1f}"
+        except Exception:
+            pass
+
+    # Sprint speed (all player types)
+    try:
+        ss_row = _load_sprint_speed(year).get(pid_str)
+        if ss_row and not result.get("sprint_speed") and ss_row.get("sprint_speed"):
+            result["sprint_speed"] = ss_row["sprint_speed"]
+    except Exception:
+        pass
 
     return result
 
