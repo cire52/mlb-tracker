@@ -1,5 +1,5 @@
 from flask import Flask, jsonify, request, render_template, session
-import json, os, concurrent.futures, threading, re
+import json, os, concurrent.futures, threading, re, secrets, time
 from werkzeug.security import generate_password_hash, check_password_hash
 from mlb_api import (search_players, get_game_log, get_player_info, clear_cache,
                      get_season_totals, get_player_transactions, get_xstats, get_pitch_mix,
@@ -48,11 +48,44 @@ def save_users(users):
 
 # ── Auth routes ───────────────────────────────────────────────────────────────
 
+def send_reset_email(to_email, reset_url):
+    api_key = os.environ.get("RESEND_API_KEY")
+    from_email = os.environ.get("FROM_EMAIL", "The Clubhouse <noreply@theclubhouse.app>")
+    if not api_key:
+        print(f"[reset] RESEND_API_KEY not set — reset URL: {reset_url}")
+        return False
+    try:
+        import requests as req
+        r = req.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={
+                "from": from_email,
+                "to": [to_email],
+                "subject": "Reset your Clubhouse password",
+                "html": f"""
+                <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px">
+                  <h2 style="color:#c8102e">⚾ The Clubhouse</h2>
+                  <p>Someone requested a password reset for your account.</p>
+                  <p>Click the button below to reset your password. This link expires in <strong>1 hour</strong>.</p>
+                  <a href="{reset_url}" style="display:inline-block;margin:20px 0;padding:12px 28px;background:#c8102e;color:#fff;text-decoration:none;border-radius:8px;font-weight:700">Reset Password</a>
+                  <p style="color:#888;font-size:0.85rem">If you didn't request this, you can ignore this email.</p>
+                </div>"""
+            },
+            timeout=10
+        )
+        return r.ok
+    except Exception as e:
+        print(f"[reset] Email send failed: {e}")
+        return False
+
+
 @app.route("/api/auth/register", methods=["POST"])
 def auth_register():
     data = request.json or {}
     username = (data.get("username") or "").strip().lower()
     password = data.get("password", "")
+    email = (data.get("email") or "").strip().lower()
     if not re.match(r'^[a-z0-9_]{3,20}$', username):
         return jsonify({"error": "Username must be 3–20 characters (letters, numbers, underscores)"}), 400
     if len(password) < 6:
@@ -63,7 +96,7 @@ def auth_register():
             return jsonify({"error": "Username already taken"}), 409
         import uuid
         uid = "user_" + uuid.uuid4().hex[:16]
-        users[username] = {"password_hash": generate_password_hash(password), "uid": uid}
+        users[username] = {"password_hash": generate_password_hash(password), "uid": uid, "email": email}
         save_users(users)
     session["username"] = username
     return jsonify({"ok": True, "username": username, "uid": uid})
@@ -98,7 +131,66 @@ def auth_me():
     if not user:
         session.pop("username", None)
         return jsonify({})
-    return jsonify({"username": username, "uid": user["uid"]})
+    return jsonify({"username": username, "uid": user["uid"], "email": user.get("email", "")})
+
+
+@app.route("/api/auth/forgot", methods=["POST"])
+def auth_forgot():
+    email = (request.json or {}).get("email", "").strip().lower()
+    if not email:
+        return jsonify({"error": "Please enter your email address"}), 400
+    with _users_lock:
+        users = load_users()
+        user_entry = next(((u, d) for u, d in users.items() if d.get("email", "").lower() == email), None)
+        if not user_entry:
+            # Don't reveal whether email exists
+            return jsonify({"ok": True})
+        username, user = user_entry
+        token = secrets.token_urlsafe(32)
+        user["reset_token"] = token
+        user["reset_expires"] = time.time() + 3600  # 1 hour
+        save_users(users)
+    app_url = os.environ.get("APP_URL", request.host_url.rstrip("/"))
+    reset_url = f"{app_url}/?reset={token}"
+    send_reset_email(email, reset_url)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/auth/reset", methods=["POST"])
+def auth_reset():
+    data = request.json or {}
+    token = data.get("token", "")
+    password = data.get("password", "")
+    if len(password) < 6:
+        return jsonify({"error": "Password must be at least 6 characters"}), 400
+    with _users_lock:
+        users = load_users()
+        user_entry = next(((u, d) for u, d in users.items()
+                           if d.get("reset_token") == token and d.get("reset_expires", 0) > time.time()), None)
+        if not user_entry:
+            return jsonify({"error": "Reset link is invalid or has expired"}), 400
+        username, user = user_entry
+        user["password_hash"] = generate_password_hash(password)
+        user.pop("reset_token", None)
+        user.pop("reset_expires", None)
+        save_users(users)
+    session["username"] = username
+    return jsonify({"ok": True, "username": username, "uid": users[username]["uid"]})
+
+
+@app.route("/api/auth/update-email", methods=["POST"])
+def auth_update_email():
+    username = session.get("username")
+    if not username:
+        return jsonify({"error": "Not logged in"}), 401
+    email = (request.json or {}).get("email", "").strip().lower()
+    with _users_lock:
+        users = load_users()
+        if username not in users:
+            return jsonify({"error": "User not found"}), 404
+        users[username]["email"] = email
+        save_users(users)
+    return jsonify({"ok": True})
 
 
 def load_tracked(uid=None):

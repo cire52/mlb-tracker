@@ -2239,10 +2239,15 @@ function closeAuth() {
 }
 
 function switchAuthTab(tab) {
+  ['login','register','forgot','reset'].forEach(t => {
+    const form = document.getElementById(`authForm${t.charAt(0).toUpperCase()+t.slice(1)}`);
+    if (form) form.style.display = t === tab ? '' : 'none';
+  });
   document.getElementById('authTabLogin').classList.toggle('active', tab === 'login');
   document.getElementById('authTabRegister').classList.toggle('active', tab === 'register');
-  document.getElementById('authFormLogin').style.display = tab === 'login' ? '' : 'none';
-  document.getElementById('authFormRegister').style.display = tab === 'register' ? '' : 'none';
+  document.getElementById('authTabBar').style.display = (tab === 'forgot' || tab === 'reset') ? 'none' : '';
+  const subs = {login: 'Sign in to sync your roster across devices', register: 'Create an account to save your roster', forgot: 'Enter your email to receive a reset link', reset: 'Choose a new password for your account'};
+  document.getElementById('authModalSub').textContent = subs[tab] || '';
   document.getElementById('authError').textContent = '';
 }
 
@@ -2256,15 +2261,47 @@ async function submitAuth(mode) {
     const confirm = document.getElementById('authRegisterConfirm').value;
     if (password !== confirm) { errEl.textContent = 'Passwords do not match.'; return; }
   }
+  const body = {username, password};
+  if (mode === 'Register') body.email = document.getElementById('authRegisterEmail').value.trim();
   try {
     const res = await fetch(`/api/auth/${mode.toLowerCase()}`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({username, password})
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
     });
     const data = await res.json();
     if (!res.ok || data.error) { errEl.textContent = data.error || 'Something went wrong.'; return; }
     currentUser = {username: data.username, uid: data.uid};
+    closeAuth();
+    renderAuthArea();
+    await loadTracked();
+  } catch(e) { errEl.textContent = 'Network error. Please try again.'; }
+}
+
+async function submitForgot() {
+  const errEl = document.getElementById('authError');
+  errEl.textContent = '';
+  const email = document.getElementById('authForgotEmail').value.trim();
+  if (!email) { errEl.textContent = 'Please enter your email address.'; return; }
+  try {
+    await fetch('/api/auth/forgot', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({email})});
+    errEl.style.color = '#4caf7d';
+    errEl.textContent = 'If that email is on an account, a reset link is on its way.';
+  } catch(e) { errEl.textContent = 'Network error. Please try again.'; }
+}
+
+async function submitReset() {
+  const errEl = document.getElementById('authError');
+  errEl.textContent = '';
+  const password = document.getElementById('authResetPass').value;
+  const confirm = document.getElementById('authResetConfirm').value;
+  if (password.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; return; }
+  if (password !== confirm) { errEl.textContent = 'Passwords do not match.'; return; }
+  const token = new URLSearchParams(window.location.search).get('reset');
+  try {
+    const res = await fetch('/api/auth/reset', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({token, password})});
+    const data = await res.json();
+    if (!res.ok || data.error) { errEl.textContent = data.error || 'Something went wrong.'; return; }
+    currentUser = {username: data.username, uid: data.uid};
+    window.history.replaceState({}, '', '/');
     closeAuth();
     renderAuthArea();
     await loadTracked();
@@ -2276,6 +2313,13 @@ async function logOut() {
   currentUser = null;
   renderAuthArea();
   await loadTracked();
+}
+
+// Check for ?reset=token in URL
+const _resetToken = new URLSearchParams(window.location.search).get('reset');
+if (_resetToken) {
+  document.getElementById('authOverlay').style.display = 'flex';
+  switchAuthTab('reset');
 }
 
 initAuth();
@@ -2334,23 +2378,39 @@ initAuth();
   <div class="auth-modal">
     <div class="auth-modal-header">
       <h2>The Clubhouse</h2>
-      <p>Sign in to sync your roster across devices</p>
-      <div class="auth-tabs">
+      <p id="authModalSub">Sign in to sync your roster across devices</p>
+      <div class="auth-tabs" id="authTabBar">
         <button class="auth-tab active" id="authTabLogin" onclick="switchAuthTab('login')">Sign In</button>
         <button class="auth-tab" id="authTabRegister" onclick="switchAuthTab('register')">Create Account</button>
       </div>
     </div>
     <div class="auth-modal-body">
+      <!-- Login -->
       <div id="authFormLogin">
         <div class="auth-field"><label>Username</label><input id="authLoginUser" type="text" placeholder="your username" autocomplete="username"></div>
         <div class="auth-field" style="margin-top:10px"><label>Password</label><input id="authLoginPass" type="password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitAuth('Login')"></div>
         <button class="auth-submit" style="margin-top:14px" onclick="submitAuth('Login')">Sign In</button>
+        <div style="text-align:center;margin-top:10px"><a href="#" style="font-size:0.78rem;color:#555;text-decoration:none" onmouseover="this.style.color='#aaa'" onmouseout="this.style.color='#555'" onclick="switchAuthTab('forgot');return false">Forgot password?</a></div>
       </div>
+      <!-- Register -->
       <div id="authFormRegister" style="display:none">
         <div class="auth-field"><label>Username</label><input id="authRegisterUser" type="text" placeholder="3–20 chars, letters/numbers/_" autocomplete="username"></div>
         <div class="auth-field" style="margin-top:10px"><label>Password</label><input id="authRegisterPass" type="password" placeholder="at least 6 characters" autocomplete="new-password"></div>
-        <div class="auth-field" style="margin-top:10px"><label>Confirm Password</label><input id="authRegisterConfirm" type="password" placeholder="••••••••" autocomplete="new-password" onkeydown="if(event.key==='Enter')submitAuth('Register')"></div>
+        <div class="auth-field" style="margin-top:10px"><label>Confirm Password</label><input id="authRegisterConfirm" type="password" placeholder="••••••••" autocomplete="new-password"></div>
+        <div class="auth-field" style="margin-top:10px"><label>Email <span style="color:#555;font-weight:400;text-transform:none">(for password recovery)</span></label><input id="authRegisterEmail" type="email" placeholder="you@example.com" autocomplete="email" onkeydown="if(event.key==='Enter')submitAuth('Register')"></div>
         <button class="auth-submit" style="margin-top:14px" onclick="submitAuth('Register')">Create Account</button>
+      </div>
+      <!-- Forgot password -->
+      <div id="authFormForgot" style="display:none">
+        <div class="auth-field"><label>Email Address</label><input id="authForgotEmail" type="email" placeholder="the email on your account" autocomplete="email" onkeydown="if(event.key==='Enter')submitForgot()"></div>
+        <button class="auth-submit" style="margin-top:14px" onclick="submitForgot()">Send Reset Link</button>
+        <div style="text-align:center;margin-top:10px"><a href="#" style="font-size:0.78rem;color:#555;text-decoration:none" onmouseover="this.style.color='#aaa'" onmouseout="this.style.color='#555'" onclick="switchAuthTab('login');return false">← Back to Sign In</a></div>
+      </div>
+      <!-- Reset password (shown when ?reset=token in URL) -->
+      <div id="authFormReset" style="display:none">
+        <div class="auth-field"><label>New Password</label><input id="authResetPass" type="password" placeholder="at least 6 characters" autocomplete="new-password"></div>
+        <div class="auth-field" style="margin-top:10px"><label>Confirm Password</label><input id="authResetConfirm" type="password" placeholder="••••••••" autocomplete="new-password" onkeydown="if(event.key==='Enter')submitReset()"></div>
+        <button class="auth-submit" style="margin-top:14px" onclick="submitReset()">Set New Password</button>
       </div>
       <div id="authError" class="auth-error"></div>
     </div>
