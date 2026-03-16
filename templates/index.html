@@ -231,6 +231,8 @@
   tbody tr:last-child td { border-bottom: none; }
   .good { color: #4caf7d; font-weight: 600; }
   .highlight { color: #f0c040; font-weight: 600; }
+  .hr-single { color: #4caf7d; font-weight: 700; }
+  .hr-multi { color: #4a9eff; font-weight: 700; }
   .decision { font-weight: 700; }
   .decision.W { color: #4caf7d; }
   .decision.L { color: #c8102e; }
@@ -1643,7 +1645,7 @@ function buildHittingTable(games) {
       <td>${formatDate(g.date)}</td><td>${esc(g.opponent)}</td>
       <td>${g.ab}</td>
       <td class="${g.h>0?'good':''}">${g.h}</td>
-      <td class="${g.hr>0?'highlight':''}">${g.hr}</td>
+      <td class="${g.hr>=2?'hr-multi':g.hr===1?'hr-single':''}">${g.hr}</td>
       <td class="${g.rbi>0?'good':''}">${g.rbi}</td>
       <td>${g.r}</td>
       <td class="${g.sb>0?'highlight':''}">${g.sb}</td>
