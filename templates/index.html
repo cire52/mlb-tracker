@@ -1898,7 +1898,10 @@ async function showNewsHub() {
         .catch(() => [])
     )
   );
-  const allItems = results.flat().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const allItems = results.flat()
+    .filter(item => !item.date || item.date >= oneWeekAgo)
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   let html = '<div class="hub-title">📰 News Hub</div>';
   if (!allItems.length) {
     html += '<div class="hub-empty">No recent news found for tracked players.</div>';
