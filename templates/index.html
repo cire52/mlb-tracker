@@ -2134,11 +2134,30 @@ async function showProbablePitchers() {
     return;
   }
 
-  // Count starts per pitcher this week
-  const startCount = {};
+  // Count starts per pitcher per calendar week (Mon–Sun)
+  // A pitcher is highlighted only if they start 2+ times in the same Mon–Sun week
+  function getWeekKey(dateStr) {
+    const d = new Date(dateStr + 'T12:00:00');
+    const day = d.getDay(); // 0=Sun,1=Mon,...,6=Sat
+    const daysToMon = (day === 0) ? 6 : day - 1;
+    const mon = new Date(d);
+    mon.setDate(d.getDate() - daysToMon);
+    return mon.toISOString().slice(0, 10);
+  }
+  // {pitcherId: {weekKey: count}}
+  const weekStarts = {};
   for (const g of games) {
-    if (g.away_pitcher?.id) startCount[g.away_pitcher.id] = (startCount[g.away_pitcher.id] || 0) + 1;
-    if (g.home_pitcher?.id) startCount[g.home_pitcher.id] = (startCount[g.home_pitcher.id] || 0) + 1;
+    const wk = getWeekKey(g.date);
+    for (const pp of [g.away_pitcher, g.home_pitcher]) {
+      if (!pp?.id) continue;
+      if (!weekStarts[pp.id]) weekStarts[pp.id] = {};
+      weekStarts[pp.id][wk] = (weekStarts[pp.id][wk] || 0) + 1;
+    }
+  }
+  // startCount[pitcherId] = max starts in any single week
+  const startCount = {};
+  for (const [pid, weeks] of Object.entries(weekStarts)) {
+    startCount[pid] = Math.max(...Object.values(weeks));
   }
 
   // Group by date
