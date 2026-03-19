@@ -1158,6 +1158,67 @@ def get_probable_pitchers(days=7):
     return games
 
 
+_hot_cold_cache = {}
+HOT_COLD_CACHE_TTL = 1800  # 30 min
+
+
+def get_hot_cold(days=14, limit=20):
+    """Return hottest and coldest hitters/pitchers over the last N days (regular season only)."""
+    now = time.time()
+    key = (days, limit)
+    if _hot_cold_cache.get(key) and now - _hot_cold_cache[key]["ts"] < HOT_COLD_CACHE_TTL:
+        return _hot_cold_cache[key]["data"]
+
+    season = datetime.date.today().year
+    result = {"hot_hitters": [], "cold_hitters": [], "hot_pitchers": [], "cold_pitchers": [], "days": days}
+
+    def fetch_stats(group, sort_stat, order, game_type="R"):
+        try:
+            r = requests.get(f"{BASE}/stats", params={
+                "stats": "lastXDays",
+                "lastXDays": days,
+                "group": group,
+                "gameType": game_type,
+                "playerPool": "qualified",
+                "limit": limit,
+                "sortStat": sort_stat,
+                "order": order,
+                "season": season,
+                "hydrate": "person,team",
+            }, timeout=10)
+            r.raise_for_status()
+            return r.json().get("stats", [{}])[0].get("splits", [])
+        except Exception as e:
+            print(f"[hot_cold] fetch error group={group} sort={sort_stat}: {e}")
+            return []
+
+    def fmt_player(split):
+        p = split.get("player", {})
+        t = split.get("team", {})
+        s = split.get("stat", {})
+        pid = p.get("id")
+        return {
+            "id": pid,
+            "name": p.get("fullName", ""),
+            "team": t.get("name", ""),
+            "team_id": t.get("id"),
+            "stat": s,
+        }
+
+    hot_hit = fetch_stats("hitting", "avg", "desc")
+    cold_hit = fetch_stats("hitting", "avg", "asc")
+    hot_pit = fetch_stats("pitching", "era", "asc")
+    cold_pit = fetch_stats("pitching", "era", "desc")
+
+    result["hot_hitters"] = [fmt_player(s) for s in hot_hit]
+    result["cold_hitters"] = [fmt_player(s) for s in cold_hit]
+    result["hot_pitchers"] = [fmt_player(s) for s in hot_pit]
+    result["cold_pitchers"] = [fmt_player(s) for s in cold_pit]
+
+    _hot_cold_cache[key] = {"data": result, "ts": now}
+    return result
+
+
 def clear_cache():
     _cache.clear()
     _savant_xstats_cache.clear()
