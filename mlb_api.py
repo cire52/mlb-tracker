@@ -1162,60 +1162,157 @@ _hot_cold_cache = {}
 HOT_COLD_CACHE_TTL = 1800  # 30 min
 
 
-def get_hot_cold(days=14, limit=20):
-    """Return hottest and coldest hitters/pitchers over the last N days (regular season only)."""
+def get_hot_cold(days=7):
+    """Return hot/cold hitters and pitchers over the last N days (regular season only).
+
+    Hot hitters: HR >= 3 OR avg >= .350 in the window (deduped).
+    Cold hitters: avg < .150 with >= 15 ABs.
+    Hot pitchers: ERA <= 2.50 with >= 3 IP.
+    Cold pitchers: ERA >= 7.00 with >= 3 IP.
+    """
     now = time.time()
-    key = (days, limit)
-    if _hot_cold_cache.get(key) and now - _hot_cold_cache[key]["ts"] < HOT_COLD_CACHE_TTL:
-        return _hot_cold_cache[key]["data"]
+    if _hot_cold_cache.get(days) and now - _hot_cold_cache[days]["ts"] < HOT_COLD_CACHE_TTL:
+        return _hot_cold_cache[days]["data"]
 
     season = datetime.date.today().year
     result = {"hot_hitters": [], "cold_hitters": [], "hot_pitchers": [], "cold_pitchers": [], "days": days}
 
-    def fetch_stats(group, sort_stat, order, game_type="R"):
+    def fetch(group, sort_stat, order, limit=300):
         try:
             r = requests.get(f"{BASE}/stats", params={
                 "stats": "lastXDays",
                 "lastXDays": days,
                 "group": group,
-                "gameType": game_type,
-                "playerPool": "qualified",
+                "gameType": "R",
+                "playerPool": "All",
                 "limit": limit,
                 "sortStat": sort_stat,
                 "order": order,
                 "season": season,
                 "hydrate": "person,team",
-            }, timeout=10)
+            }, timeout=12)
             r.raise_for_status()
             return r.json().get("stats", [{}])[0].get("splits", [])
         except Exception as e:
             print(f"[hot_cold] fetch error group={group} sort={sort_stat}: {e}")
             return []
 
-    def fmt_player(split):
+    def fmt(split):
         p = split.get("player", {})
         t = split.get("team", {})
         s = split.get("stat", {})
-        pid = p.get("id")
         return {
-            "id": pid,
+            "id": p.get("id"),
             "name": p.get("fullName", ""),
             "team": t.get("name", ""),
             "team_id": t.get("id"),
-            "stat": s,
+            "stat": {
+                "avg":         s.get("avg"),
+                "obp":         s.get("obp"),
+                "slg":         s.get("slg"),
+                "ops":         s.get("ops"),
+                "atBats":      s.get("atBats", 0),
+                "hits":        s.get("hits", 0),
+                "homeRuns":    s.get("homeRuns", 0),
+                "rbi":         s.get("rbi", 0),
+                "runs":        s.get("runs", 0),
+                "stolenBases": s.get("stolenBases", 0),
+                "baseOnBalls": s.get("baseOnBalls", 0),
+                "strikeOuts":  s.get("strikeOuts", 0),
+                "gamesPlayed": s.get("gamesPlayed", 0),
+                # pitching
+                "era":            s.get("era"),
+                "inningsPitched": s.get("inningsPitched"),
+                "wins":           s.get("wins", 0),
+                "losses":         s.get("losses", 0),
+                "saves":          s.get("saves", 0),
+                "pitcherStrikeOuts": s.get("strikeOuts", 0),
+                "walks":          s.get("baseOnBalls", 0),
+                "whip":           s.get("whip"),
+                "earnedRuns":     s.get("earnedRuns", 0),
+            },
+            "reasons": [],  # populated below
         }
 
-    hot_hit = fetch_stats("hitting", "avg", "desc")
-    cold_hit = fetch_stats("hitting", "avg", "asc")
-    hot_pit = fetch_stats("pitching", "era", "asc")
-    cold_pit = fetch_stats("pitching", "era", "desc")
+    # ── Hitters ──
+    by_hr  = fetch("hitting", "homeRuns", "desc")
+    by_avg = fetch("hitting", "avg", "desc")
 
-    result["hot_hitters"] = [fmt_player(s) for s in hot_hit]
-    result["cold_hitters"] = [fmt_player(s) for s in cold_hit]
-    result["hot_pitchers"] = [fmt_player(s) for s in hot_pit]
-    result["cold_pitchers"] = [fmt_player(s) for s in cold_pit]
+    seen = {}
+    for split in by_hr:
+        p = fmt(split)
+        hr = p["stat"]["homeRuns"]
+        if hr >= 3:
+            p["reasons"].append(f"{hr} HR")
+            seen[p["id"]] = p
+    for split in by_avg:
+        p = fmt(split)
+        avg_raw = p["stat"]["avg"]
+        try:
+            avg_val = float(avg_raw)
+        except (TypeError, ValueError):
+            continue
+        if avg_val >= 0.350 and p["stat"]["atBats"] >= 5:
+            if p["id"] in seen:
+                seen[p["id"]]["reasons"].append(f".{int(avg_val*1000):03d} AVG")
+            else:
+                p["reasons"].append(f".{int(avg_val*1000):03d} AVG")
+                seen[p["id"]] = p
 
-    _hot_cold_cache[key] = {"data": result, "ts": now}
+    result["hot_hitters"] = sorted(seen.values(), key=lambda x: (-x["stat"]["homeRuns"], -(float(x["stat"]["avg"] or 0))))
+
+    cold_splits = fetch("hitting", "avg", "asc", limit=200)
+    cold_seen = set()
+    for split in cold_splits:
+        p = fmt(split)
+        if p["stat"]["atBats"] < 15:
+            continue
+        try:
+            avg_val = float(p["stat"]["avg"] or 1)
+        except (TypeError, ValueError):
+            continue
+        if avg_val < 0.150 and p["id"] not in cold_seen:
+            cold_seen.add(p["id"])
+            result["cold_hitters"].append(p)
+        if len(result["cold_hitters"]) >= 20:
+            break
+
+    # ── Pitchers ──
+    pit_splits = fetch("pitching", "era", "asc", limit=200)
+    for split in pit_splits:
+        p = fmt(split)
+        ip = p["stat"]["inningsPitched"]
+        try:
+            ip_val = float(ip or 0)
+        except (TypeError, ValueError):
+            ip_val = 0
+        try:
+            era_val = float(p["stat"]["era"] or 99)
+        except (TypeError, ValueError):
+            era_val = 99
+        if ip_val >= 3 and era_val <= 2.50:
+            result["hot_pitchers"].append(p)
+        if len(result["hot_pitchers"]) >= 20:
+            break
+
+    cold_pit = fetch("pitching", "era", "desc", limit=200)
+    for split in cold_pit:
+        p = fmt(split)
+        ip = p["stat"]["inningsPitched"]
+        try:
+            ip_val = float(ip or 0)
+        except (TypeError, ValueError):
+            ip_val = 0
+        try:
+            era_val = float(p["stat"]["era"] or 0)
+        except (TypeError, ValueError):
+            era_val = 0
+        if ip_val >= 3 and era_val >= 7.00:
+            result["cold_pitchers"].append(p)
+        if len(result["cold_pitchers"]) >= 20:
+            break
+
+    _hot_cold_cache[days] = {"data": result, "ts": now}
     return result
 
 

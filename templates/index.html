@@ -2321,7 +2321,7 @@ async function showHotCold() {
 
   let data;
   try {
-    const r = await fetch('/api/hot-cold?days=14');
+    const r = await fetch('/api/hot-cold?days=7');
     data = await r.json();
   } catch(e) {
     main.innerHTML = '<div class="hub-title">🔥 Hot/Cold Players</div><div class="hub-empty">Failed to load data.</div>';
@@ -2331,59 +2331,87 @@ async function showHotCold() {
   const trackedIds = new Set(trackedPlayers.map(p => p.id));
   const noData = !data.hot_hitters.length && !data.cold_hitters.length && !data.hot_pitchers.length && !data.cold_pitchers.length;
 
-  const renderRow = (p, statLine) => {
+  const fmtAvg = v => v != null ? parseFloat(v).toFixed(3).replace(/^0/, '') : '—';
+  const fmtNum = v => v ?? '—';
+
+  const renderHitterRow = (p, isHot) => {
+    const s = p.stat;
     const headshot = `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/${p.id}/headshot/67/current`;
-    const logo = p.team_id ? `<img src="https://www.mlbstatic.com/team-logos/${p.team_id}.svg" onerror="this.style.display='none'" style="width:18px;height:18px;object-fit:contain;flex-shrink:0">` : '';
+    const logo = p.team_id ? `<img src="https://www.mlbstatic.com/team-logos/${p.team_id}.svg" onerror="this.style.display='none'" style="width:16px;height:16px;object-fit:contain;flex-shrink:0">` : '';
     const tracked = trackedIds.has(p.id) ? '<span style="color:#c8102e;font-size:0.68rem;margin-left:4px">●</span>' : '';
-    return `<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:#0c0d11;border:1px solid #404862;border-radius:8px;margin-bottom:6px">
-      <img src="${headshot}" onerror="this.src='${GENERIC_HEADSHOT}'" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0">
-      <div style="flex:1;min-width:0">
-        <div style="font-size:0.88rem;font-weight:700;color:#e0e0e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}${tracked}</div>
-        <div style="display:flex;align-items:center;gap:4px;margin-top:2px">${logo}<span style="font-size:0.72rem;color:#666">${esc(p.team)}</span></div>
+    const reasons = (p.reasons || []).map(r => `<span style="font-size:0.65rem;font-weight:700;padding:1px 6px;border-radius:10px;background:${isHot?'#4caf7d22':'#4a9eff22'};color:${isHot?'#4caf7d':'#4a9eff'}">${esc(r)}</span>`).join('');
+    const statLine = [
+      `<span title="Avg">${fmtAvg(s.avg)}</span>`,
+      `<span title="AB">${fmtNum(s.atBats)} AB</span>`,
+      `<span title="Hits">${fmtNum(s.hits)} H</span>`,
+      `<span title="HR">${fmtNum(s.homeRuns)} HR</span>`,
+      `<span title="RBI">${fmtNum(s.rbi)} RBI</span>`,
+      `<span title="R">${fmtNum(s.runs)} R</span>`,
+      `<span title="SB">${fmtNum(s.stolenBases)} SB</span>`,
+      `<span title="BB">${fmtNum(s.baseOnBalls)} BB</span>`,
+      `<span title="K">${fmtNum(s.strikeOuts)} K</span>`,
+    ].join('<span style="color:#333;margin:0 3px">·</span>');
+    return `<div style="padding:10px 12px;background:#0c0d11;border:1px solid #404862;border-radius:8px;margin-bottom:6px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+        <img src="${headshot}" onerror="this.src='${GENERIC_HEADSHOT}'" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:0.88rem;font-weight:700;color:#e0e0e0">${esc(p.name)}${tracked} ${reasons}</div>
+          <div style="display:flex;align-items:center;gap:4px;margin-top:2px">${logo}<span style="font-size:0.72rem;color:#666">${esc(p.team)}</span></div>
+        </div>
       </div>
-      <div style="font-size:0.82rem;font-weight:700;color:#aaa;white-space:nowrap;text-align:right">${statLine}</div>
+      <div style="font-size:0.76rem;color:#888;display:flex;flex-wrap:wrap;gap:4px">${statLine}</div>
     </div>`;
   };
 
-  const fmtHitter = p => {
+  const renderPitcherRow = (p, isHot) => {
     const s = p.stat;
-    const avg = s.avg != null ? parseFloat(s.avg).toFixed(3).replace(/^0/, '') : '—';
-    const hr = s.homeRuns ?? '—';
-    const rbi = s.rbi ?? '—';
-    return `AVG ${avg} · ${hr} HR · ${rbi} RBI`;
-  };
-  const fmtPitcher = p => {
-    const s = p.stat;
+    const headshot = `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/${p.id}/headshot/67/current`;
+    const logo = p.team_id ? `<img src="https://www.mlbstatic.com/team-logos/${p.team_id}.svg" onerror="this.style.display='none'" style="width:16px;height:16px;object-fit:contain;flex-shrink:0">` : '';
+    const tracked = trackedIds.has(p.id) ? '<span style="color:#c8102e;font-size:0.68rem;margin-left:4px">●</span>' : '';
     const era = s.era != null ? parseFloat(s.era).toFixed(2) : '—';
-    const so = s.strikeOuts ?? '—';
-    const ip = s.inningsPitched ?? '—';
-    return `ERA ${era} · ${so} K · ${ip} IP`;
+    const whip = s.whip != null ? parseFloat(s.whip).toFixed(2) : '—';
+    const statLine = [
+      `<span>ERA ${era}</span>`,
+      `<span>${fmtNum(s.inningsPitched)} IP</span>`,
+      `<span>${fmtNum(s.pitcherStrikeOuts)} K</span>`,
+      `<span>${fmtNum(s.walks)} BB</span>`,
+      `<span>${fmtNum(s.earnedRuns)} ER</span>`,
+      `<span>WHIP ${whip}</span>`,
+    ].join('<span style="color:#333;margin:0 3px">·</span>');
+    return `<div style="padding:10px 12px;background:#0c0d11;border:1px solid #404862;border-radius:8px;margin-bottom:6px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+        <img src="${headshot}" onerror="this.src='${GENERIC_HEADSHOT}'" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:0.88rem;font-weight:700;color:#e0e0e0">${esc(p.name)}${tracked}</div>
+          <div style="display:flex;align-items:center;gap:4px;margin-top:2px">${logo}<span style="font-size:0.72rem;color:#666">${esc(p.team)}</span></div>
+        </div>
+      </div>
+      <div style="font-size:0.76rem;color:#888;display:flex;flex-wrap:wrap;gap:4px">${statLine}</div>
+    </div>`;
   };
 
-  const section = (title, color, emoji, players, fmtFn) => {
+  const section = (title, color, emoji, players, rowFn, isHot) => {
     if (!players.length) return '';
     return `<div style="margin-bottom:24px">
       <div style="font-size:0.78rem;font-weight:700;color:${color};text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px">${emoji} ${title}</div>
-      ${players.map(p => renderRow(p, fmtFn(p))).join('')}
+      ${players.map(p => rowFn(p, isHot)).join('')}
     </div>`;
   };
 
   const tabStyle = (active) => `padding:9px 18px;background:none;border:none;border-bottom:2px solid ${active ? '#c8102e' : 'transparent'};color:${active ? '#fff' : '#666'};font-size:0.87rem;font-weight:600;cursor:pointer;margin-bottom:-1px`;
 
   const hittersHtml = noData ? '' :
-    section('Hottest Hitters', '#4caf7d', '🔥', data.hot_hitters, fmtHitter) +
-    section('Coldest Hitters', '#4a9eff', '🧊', data.cold_hitters, fmtHitter);
+    section('Hot Hitters', '#4caf7d', '🔥', data.hot_hitters, renderHitterRow, true) +
+    section('Cold Hitters', '#4a9eff', '🧊', data.cold_hitters, renderHitterRow, false);
 
   const pitchersHtml = noData ? '' :
-    section('Best Pitchers', '#4caf7d', '🔥', data.hot_pitchers, fmtPitcher) +
-    section('Struggling Pitchers', '#4a9eff', '🧊', data.cold_pitchers, fmtPitcher);
+    section('Hot Pitchers', '#4caf7d', '🔥', data.hot_pitchers, renderPitcherRow, true) +
+    section('Cold Pitchers', '#4a9eff', '🧊', data.cold_pitchers, renderPitcherRow, false);
 
-  const emptyMsg = noData
-    ? `<div class="hub-empty" style="padding-top:60px">No regular season data yet.<br><span style="font-size:0.8rem;color:#444">Check back when the regular season starts.</span></div>`
-    : '';
+  const emptyMsg = `<div class="hub-empty" style="padding-top:60px">No regular season data yet.<br><span style="font-size:0.8rem;color:#444">Check back when the regular season starts.</span></div>`;
 
   main.innerHTML = `
-    <div class="hub-title">🔥 Hot/Cold Players <span style="font-size:0.75rem;font-weight:400;color:#555;margin-left:8px">Last 14 Days</span></div>
+    <div class="hub-title">🔥 Hot/Cold Players <span style="font-size:0.75rem;font-weight:400;color:#555;margin-left:8px">Last 7 Days</span></div>
     <div style="display:flex;gap:0;border-bottom:1px solid #404862;margin-bottom:16px">
       <button id="hcTabHitters" onclick="switchHCTab('hitters')" style="${tabStyle(true)}">Hitters</button>
       <button id="hcTabPitchers" onclick="switchHCTab('pitchers')" style="${tabStyle(false)}">Pitchers</button>
