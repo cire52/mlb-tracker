@@ -2451,6 +2451,7 @@ async function submitAuth(mode) {
   }
   const body = {username, password};
   if (mode === 'Register') body.email = document.getElementById('authRegisterEmail').value.trim();
+  if (mode === 'Login') body.remember = document.getElementById('authRemember').checked;
   try {
     const res = await fetch(`/api/auth/${mode.toLowerCase()}`, {
       method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
@@ -2583,7 +2584,11 @@ initAuth();
       <div id="authFormLogin">
         <div class="auth-field"><label>Username</label><input id="authLoginUser" type="text" placeholder="your username" autocomplete="username"></div>
         <div class="auth-field" style="margin-top:10px"><label>Password</label><input id="authLoginPass" type="password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitAuth('Login')"></div>
-        <button class="auth-submit" style="margin-top:14px" onclick="submitAuth('Login')">Sign In</button>
+        <div style="display:flex;align-items:center;gap:7px;margin-top:12px">
+          <input type="checkbox" id="authRemember" style="accent-color:#c8102e;width:14px;height:14px;cursor:pointer">
+          <label for="authRemember" style="font-size:0.78rem;color:#888;cursor:pointer">Remember me for 30 days</label>
+        </div>
+        <button class="auth-submit" style="margin-top:12px" onclick="submitAuth('Login')">Sign In</button>
         <div style="text-align:center;margin-top:10px"><a href="#" style="font-size:0.78rem;color:#555;text-decoration:none" onmouseover="this.style.color='#aaa'" onmouseout="this.style.color='#555'" onclick="switchAuthTab('forgot');return false">Forgot password?</a></div>
       </div>
       <!-- Register -->

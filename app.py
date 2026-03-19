@@ -11,6 +11,7 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "clubhouse-dev-key-please-set-SECRET_KEY-env")
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = os.environ.get("RAILWAY_ENVIRONMENT") is not None
+app.config["PERMANENT_SESSION_LIFETIME"] = 60 * 60 * 24 * 30  # 30 days
 
 # Use /tmp for writable storage on cloud platforms, fallback to local
 STORAGE_DIR = os.environ.get("STORAGE_DIR", ".")
@@ -115,6 +116,8 @@ def auth_login():
     if not user or not check_password_hash(user["password_hash"], password):
         return jsonify({"error": "Invalid username or password"}), 401
     session["username"] = username
+    if data.get("remember"):
+        session.permanent = True
     return jsonify({"ok": True, "username": username, "uid": user["uid"]})
 
 
