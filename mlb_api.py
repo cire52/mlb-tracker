@@ -1162,7 +1162,7 @@ _hot_cold_cache = {}
 HOT_COLD_CACHE_TTL = 1800  # 30 min
 
 
-def get_hot_cold(days=7):
+def get_hot_cold(days=14):
     """Return hot/cold hitters and pitchers over the last N days (regular season only)."""
     now = time.time()
     if _hot_cold_cache.get(days) and now - _hot_cold_cache[days]["ts"] < HOT_COLD_CACHE_TTL:
@@ -1197,251 +1197,294 @@ def get_hot_cold(days=7):
         except (TypeError, ValueError):
             return default
 
+    def parse_ip(ip_str):
+        """Convert '6.2' (6⅔ innings) to true float 6.667."""
+        try:
+            ip = float(ip_str or 0)
+            whole = int(ip)
+            thirds = round((ip - whole) * 10)
+            return whole + thirds / 3.0
+        except (TypeError, ValueError):
+            return 0.0
+
     def fmt(split):
         p = split.get("player", {})
         t = split.get("team", {})
         s = split.get("stat", {})
+
+        ab   = s.get("atBats", 0)
+        bb   = s.get("baseOnBalls", 0)
+        so   = s.get("strikeOuts", 0)
+        slg  = _f(s.get("slg"))
+        avg  = _f(s.get("avg"))
+        obp  = _f(s.get("obp"))
+        pa   = ab + bb
+        xbh  = s.get("doubles", 0) + s.get("triples", 0) + s.get("homeRuns", 0)
+        iso  = round(slg - avg, 3)
+        bb_pct = round(bb / pa, 3) if pa >= 10 else None
+        k_pct  = round(so / pa, 3) if pa >= 10 else None
+
+        ip_true = parse_ip(s.get("inningsPitched"))
+        pit_k   = s.get("strikeOuts", 0)
+        pit_bb  = s.get("baseOnBalls", 0)
+        pit_h   = s.get("hits", 0)
+        pit_hr  = s.get("homeRuns", 0)
+        pit_er  = s.get("earnedRuns", 0)
+        k9   = round(pit_k  / ip_true * 9, 2) if ip_true > 0 else None
+        bb9  = round(pit_bb / ip_true * 9, 2) if ip_true > 0 else None
+        h9   = round(pit_h  / ip_true * 9, 2) if ip_true > 0 else None
+        hr9  = round(pit_hr / ip_true * 9, 2) if ip_true > 0 else None
+        kbb  = round(pit_k  / pit_bb, 2) if pit_bb > 0 else None
+        fip_const = 3.10
+        fip  = round((13 * pit_hr + 3 * pit_bb - 2 * pit_k) / ip_true + fip_const, 2) if ip_true >= 3 else None
+
         return {
             "id": p.get("id"),
             "name": p.get("fullName", ""),
             "team": t.get("name", ""),
             "team_id": t.get("id"),
             "stat": {
-                "avg":         s.get("avg"),
-                "obp":         s.get("obp"),
-                "slg":         s.get("slg"),
-                "ops":         s.get("ops"),
-                "atBats":      s.get("atBats", 0),
-                "hits":        s.get("hits", 0),
-                "doubles":     s.get("doubles", 0),
-                "triples":     s.get("triples", 0),
-                "homeRuns":    s.get("homeRuns", 0),
-                "rbi":         s.get("rbi", 0),
-                "runs":        s.get("runs", 0),
-                "stolenBases": s.get("stolenBases", 0),
-                "baseOnBalls": s.get("baseOnBalls", 0),
-                "strikeOuts":  s.get("strikeOuts", 0),
+                # hitting raw
+                "avg": s.get("avg"), "obp": s.get("obp"),
+                "slg": s.get("slg"), "ops": s.get("ops"),
+                "pa": pa, "atBats": ab, "hits": s.get("hits", 0),
+                "doubles": s.get("doubles", 0), "triples": s.get("triples", 0),
+                "homeRuns": s.get("homeRuns", 0), "rbi": s.get("rbi", 0),
+                "runs": s.get("runs", 0), "stolenBases": s.get("stolenBases", 0),
+                "baseOnBalls": bb, "strikeOuts": so,
                 "gamesPlayed": s.get("gamesPlayed", 0),
-                # pitching
-                "era":              s.get("era"),
-                "inningsPitched":   s.get("inningsPitched"),
-                "wins":             s.get("wins", 0),
-                "losses":           s.get("losses", 0),
-                "saves":            s.get("saves", 0),
-                "blownSaves":       s.get("blownSaves", 0),
-                "pitcherStrikeOuts":s.get("strikeOuts", 0),
-                "walks":            s.get("baseOnBalls", 0),
-                "whip":             s.get("whip"),
-                "earnedRuns":       s.get("earnedRuns", 0),
-                "hitsAllowed":      s.get("hits", 0),
-                "hitBatsmen":       s.get("hitBatsmen", 0),
-                "battersFaced":     s.get("battersFaced", 0),
+                # hitting computed
+                "xbh": xbh, "iso": iso,
+                "bbPct": bb_pct, "kPct": k_pct,
+                # pitching raw
+                "era": s.get("era"), "inningsPitched": s.get("inningsPitched"),
+                "ipTrue": ip_true,
+                "wins": s.get("wins", 0), "losses": s.get("losses", 0),
+                "saves": s.get("saves", 0), "blownSaves": s.get("blownSaves", 0),
+                "pitcherStrikeOuts": pit_k, "walks": pit_bb,
+                "whip": s.get("whip"), "earnedRuns": pit_er,
+                "hitsAllowed": pit_h, "homeRunsAllowed": pit_hr,
+                "hitBatsmen": s.get("hitBatsmen", 0),
+                "battersFaced": s.get("battersFaced", 0),
+                # pitching computed
+                "k9": k9, "bb9": bb9, "h9": h9, "hr9": hr9,
+                "kbb": kbb, "fip": fip,
             },
             "reasons": [],
         }
 
     # ── Parallel fetches ──
     fetch_jobs = [
-        # hitting hot
+        # hitting
         ("hitting", "homeRuns",    "desc"),
         ("hitting", "avg",         "desc"),
         ("hitting", "rbi",         "desc"),
         ("hitting", "stolenBases", "desc"),
         ("hitting", "ops",         "desc"),
         ("hitting", "slg",         "desc"),
+        ("hitting", "obp",         "desc"),
         ("hitting", "hits",        "desc"),
         ("hitting", "runs",        "desc"),
         ("hitting", "doubles",     "desc"),
-        # hitting cold
         ("hitting", "avg",         "asc"),
         ("hitting", "strikeOuts",  "desc"),
         ("hitting", "ops",         "asc"),
-        # pitching hot
+        ("hitting", "obp",         "asc"),
+        # pitching
         ("pitching", "era",         "asc"),
         ("pitching", "strikeOuts",  "desc"),
         ("pitching", "whip",        "asc"),
         ("pitching", "saves",       "desc"),
-        # pitching cold
         ("pitching", "era",         "desc"),
         ("pitching", "whip",        "desc"),
         ("pitching", "baseOnBalls", "desc"),
         ("pitching", "hits",        "desc"),
+        ("pitching", "homeRuns",    "desc"),
     ]
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as ex:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=12) as ex:
         futures = {ex.submit(fetch, g, s, o): (g, s, o) for g, s, o in fetch_jobs}
         fetched = {}
         for fut in concurrent.futures.as_completed(futures):
-            key = futures[fut]
-            fetched[key] = fut.result()
+            fetched[futures[fut]] = fut.result()
 
-    def splits(group, sort_stat, order):
+    def sp(group, sort_stat, order):
         return fetched.get((group, sort_stat, order), [])
 
+    def apply_criteria(criteria_list):
+        seen = {}
+        for split_list, check, label_fn in criteria_list:
+            for split in split_list:
+                p = fmt(split)
+                if not p["id"] or not check(p):
+                    continue
+                label = label_fn(p)
+                if p["id"] in seen:
+                    if label not in seen[p["id"]]["reasons"]:
+                        seen[p["id"]]["reasons"].append(label)
+                else:
+                    p["reasons"] = [label]
+                    seen[p["id"]] = p
+        return seen
+
+    # Global minimums (14-day window)
+    HIT_MIN_PA  = 25   # plate appearances (ab + bb proxy)
+    HIT_MIN_PA_STRICT = 35  # for cold / small-sample checks
+    PIT_MIN_IP  = 7    # innings pitched for starters
+    PIT_MIN_IP_REL = 4  # relievers / closers
+
     # ─────────────────────────────────────────────
-    # HOT HITTERS
-    # Criteria (any one qualifies):
-    #   HR >= 3 | AVG >= .350 (10+ AB) | RBI >= 8 | SB >= 3
-    #   OPS >= .950 (10+ AB) | SLG >= .650 (10+ AB)
-    #   Hits >= 11 | Runs >= 6 | Doubles >= 3
+    # HOT HITTERS — 15 criteria (14-day thresholds)
     # ─────────────────────────────────────────────
     hot_hit_criteria = [
-        (splits("hitting", "homeRuns",    "desc"), lambda p: p["stat"]["homeRuns"] >= 3,
+        # Power
+        (sp("hitting","homeRuns","desc"),   lambda p: p["stat"]["homeRuns"] >= 5 and p["stat"]["pa"] >= HIT_MIN_PA,
          lambda p: f"{p['stat']['homeRuns']} HR"),
-        (splits("hitting", "avg",         "desc"), lambda p: _f(p["stat"]["avg"]) >= 0.350 and p["stat"]["atBats"] >= 10,
-         lambda p: f".{int(_f(p['stat']['avg'])*1000):03d} AVG"),
-        (splits("hitting", "rbi",         "desc"), lambda p: p["stat"]["rbi"] >= 8,
-         lambda p: f"{p['stat']['rbi']} RBI"),
-        (splits("hitting", "stolenBases", "desc"), lambda p: p["stat"]["stolenBases"] >= 3,
-         lambda p: f"{p['stat']['stolenBases']} SB"),
-        (splits("hitting", "ops",         "desc"), lambda p: _f(p["stat"]["ops"]) >= 0.950 and p["stat"]["atBats"] >= 10,
-         lambda p: f"{_f(p['stat']['ops']):.3f} OPS"),
-        (splits("hitting", "slg",         "desc"), lambda p: _f(p["stat"]["slg"]) >= 0.650 and p["stat"]["atBats"] >= 10,
+        (sp("hitting","slg","desc"),        lambda p: _f(p["stat"]["slg"]) >= 0.650 and p["stat"]["pa"] >= HIT_MIN_PA,
          lambda p: f".{int(_f(p['stat']['slg'])*1000):03d} SLG"),
-        (splits("hitting", "hits",        "desc"), lambda p: p["stat"]["hits"] >= 11,
-         lambda p: f"{p['stat']['hits']} H"),
-        (splits("hitting", "runs",        "desc"), lambda p: p["stat"]["runs"] >= 6,
-         lambda p: f"{p['stat']['runs']} R"),
-        (splits("hitting", "doubles",     "desc"), lambda p: p["stat"]["doubles"] >= 3,
+        (sp("hitting","avg","desc"),        lambda p: p["stat"]["iso"] >= 0.280 and p["stat"]["pa"] >= HIT_MIN_PA,
+         lambda p: f".{int(p['stat']['iso']*1000):03d} ISO"),
+        (sp("hitting","doubles","desc"),    lambda p: p["stat"]["doubles"] >= 5 and p["stat"]["pa"] >= HIT_MIN_PA,
          lambda p: f"{p['stat']['doubles']} 2B"),
+        (sp("hitting","hits","desc"),       lambda p: p["stat"]["triples"] >= 2 and p["stat"]["pa"] >= HIT_MIN_PA,
+         lambda p: f"{p['stat']['triples']} 3B"),
+        # Contact / Average
+        (sp("hitting","avg","desc"),        lambda p: _f(p["stat"]["avg"]) >= 0.350 and p["stat"]["pa"] >= HIT_MIN_PA,
+         lambda p: f".{int(_f(p['stat']['avg'])*1000):03d} AVG"),
+        (sp("hitting","hits","desc"),       lambda p: p["stat"]["hits"] >= 20 and p["stat"]["pa"] >= HIT_MIN_PA,
+         lambda p: f"{p['stat']['hits']} H"),
+        # Production
+        (sp("hitting","rbi","desc"),        lambda p: p["stat"]["rbi"] >= 14 and p["stat"]["pa"] >= HIT_MIN_PA,
+         lambda p: f"{p['stat']['rbi']} RBI"),
+        (sp("hitting","runs","desc"),       lambda p: p["stat"]["runs"] >= 10 and p["stat"]["pa"] >= HIT_MIN_PA,
+         lambda p: f"{p['stat']['runs']} R"),
+        (sp("hitting","hits","desc"),       lambda p: p["stat"]["xbh"] >= 8 and p["stat"]["pa"] >= HIT_MIN_PA,
+         lambda p: f"{p['stat']['xbh']} XBH"),
+        # Speed
+        (sp("hitting","stolenBases","desc"),lambda p: p["stat"]["stolenBases"] >= 5 and p["stat"]["pa"] >= HIT_MIN_PA,
+         lambda p: f"{p['stat']['stolenBases']} SB"),
+        # Advanced / On-base
+        (sp("hitting","ops","desc"),        lambda p: _f(p["stat"]["ops"]) >= 0.950 and p["stat"]["pa"] >= HIT_MIN_PA,
+         lambda p: f"{_f(p['stat']['ops']):.3f} OPS"),
+        (sp("hitting","obp","desc"),        lambda p: _f(p["stat"]["obp"]) >= 0.430 and p["stat"]["pa"] >= HIT_MIN_PA,
+         lambda p: f".{int(_f(p['stat']['obp'])*1000):03d} OBP"),
+        (sp("hitting","obp","desc"),        lambda p: p["stat"]["bbPct"] is not None and p["stat"]["bbPct"] >= 0.180 and p["stat"]["pa"] >= HIT_MIN_PA,
+         lambda p: f"{int(p['stat']['bbPct']*100)}% BB%"),
+        (sp("hitting","avg","desc"),        lambda p: p["stat"]["kPct"] is not None and p["stat"]["kPct"] <= 0.100 and p["stat"]["pa"] >= HIT_MIN_PA_STRICT,
+         lambda p: f"{int(p['stat']['kPct']*100)}% K%"),
     ]
 
-    hot_hit_seen = {}
-    for split_list, check, label_fn in hot_hit_criteria:
-        for split in split_list:
-            p = fmt(split)
-            if not p["id"] or not check(p):
-                continue
-            label = label_fn(p)
-            if p["id"] in hot_hit_seen:
-                if label not in hot_hit_seen[p["id"]]["reasons"]:
-                    hot_hit_seen[p["id"]]["reasons"].append(label)
-            else:
-                p["reasons"] = [label]
-                hot_hit_seen[p["id"]] = p
-
+    hot_hit_seen = apply_criteria(hot_hit_criteria)
     result["hot_hitters"] = sorted(
         hot_hit_seen.values(),
         key=lambda x: (-len(x["reasons"]), -x["stat"]["homeRuns"], -_f(x["stat"]["ops"]))
     )
 
     # ─────────────────────────────────────────────
-    # COLD HITTERS
-    # Criteria (any one qualifies):
-    #   AVG < .150 (15+ AB) | K >= 12 (15+ AB)
-    #   OPS < .450 (15+ AB) | SLG < .200 (15+ AB)
-    #   0 XBH (doubles+triples+HR) with 15+ AB
+    # COLD HITTERS — 9 criteria (14-day thresholds)
     # ─────────────────────────────────────────────
     cold_hit_criteria = [
-        (splits("hitting", "avg",        "asc"),  lambda p: _f(p["stat"]["avg"], 1) < 0.150 and p["stat"]["atBats"] >= 15,
+        (sp("hitting","avg","asc"),         lambda p: _f(p["stat"]["avg"],1) < 0.180 and p["stat"]["pa"] >= HIT_MIN_PA_STRICT,
          lambda p: f".{int(_f(p['stat']['avg'])*1000):03d} AVG"),
-        (splits("hitting", "strikeOuts", "desc"), lambda p: p["stat"]["strikeOuts"] >= 12 and p["stat"]["atBats"] >= 15,
+        (sp("hitting","strikeOuts","desc"), lambda p: p["stat"]["strikeOuts"] >= 20 and p["stat"]["pa"] >= HIT_MIN_PA_STRICT,
          lambda p: f"{p['stat']['strikeOuts']} K"),
-        (splits("hitting", "ops",        "asc"),  lambda p: _f(p["stat"]["ops"], 1) < 0.450 and p["stat"]["atBats"] >= 15,
+        (sp("hitting","ops","asc"),         lambda p: _f(p["stat"]["ops"],1) < 0.500 and p["stat"]["pa"] >= HIT_MIN_PA_STRICT,
          lambda p: f"{_f(p['stat']['ops']):.3f} OPS"),
-        (splits("hitting", "avg",        "asc"),  lambda p: _f(p["stat"]["slg"], 1) < 0.200 and p["stat"]["atBats"] >= 15,
+        (sp("hitting","avg","asc"),         lambda p: _f(p["stat"]["slg"],1) < 0.250 and p["stat"]["pa"] >= HIT_MIN_PA_STRICT,
          lambda p: f".{int(_f(p['stat']['slg'])*1000):03d} SLG"),
-        (splits("hitting", "avg",        "asc"),  lambda p: (p["stat"]["doubles"] + p["stat"]["triples"] + p["stat"]["homeRuns"]) == 0 and p["stat"]["atBats"] >= 15,
+        (sp("hitting","avg","asc"),         lambda p: p["stat"]["xbh"] <= 1 and p["stat"]["pa"] >= HIT_MIN_PA_STRICT,
          lambda p: "0 XBH"),
+        (sp("hitting","obp","asc"),         lambda p: _f(p["stat"]["obp"],1) < 0.220 and p["stat"]["pa"] >= HIT_MIN_PA_STRICT,
+         lambda p: f".{int(_f(p['stat']['obp'])*1000):03d} OBP"),
+        (sp("hitting","avg","asc"),         lambda p: p["stat"]["iso"] < 0.080 and p["stat"]["pa"] >= HIT_MIN_PA_STRICT,
+         lambda p: "0 Power"),
+        (sp("hitting","strikeOuts","desc"), lambda p: p["stat"]["kPct"] is not None and p["stat"]["kPct"] >= 0.350 and p["stat"]["pa"] >= HIT_MIN_PA_STRICT,
+         lambda p: f"{int(p['stat']['kPct']*100)}% K%"),
+        (sp("hitting","avg","asc"),         lambda p: p["stat"]["baseOnBalls"] <= 1 and p["stat"]["pa"] >= 40,
+         lambda p: "0 BB"),
     ]
 
-    cold_hit_seen = {}
-    for split_list, check, label_fn in cold_hit_criteria:
-        for split in split_list:
-            p = fmt(split)
-            if not p["id"] or not check(p):
-                continue
-            label = label_fn(p)
-            if p["id"] in cold_hit_seen:
-                if label not in cold_hit_seen[p["id"]]["reasons"]:
-                    cold_hit_seen[p["id"]]["reasons"].append(label)
-            else:
-                p["reasons"] = [label]
-                cold_hit_seen[p["id"]] = p
-
+    cold_hit_seen = apply_criteria(cold_hit_criteria)
     result["cold_hitters"] = sorted(
         cold_hit_seen.values(),
-        key=lambda x: (_f(x["stat"]["avg"], 1), -x["stat"]["strikeOuts"])
-    )[:30]
+        key=lambda x: (-len(x["reasons"]), _f(x["stat"]["avg"],1), -x["stat"]["strikeOuts"])
+    )[:35]
 
     # ─────────────────────────────────────────────
-    # HOT PITCHERS
-    # Criteria (any one qualifies):
-    #   ERA <= 2.50 (5+ IP) | K >= 10 | WHIP <= 0.85 (5+ IP)
-    #   0 ER (3+ IP) | Saves >= 2
+    # HOT PITCHERS — 12 criteria (14-day thresholds)
     # ─────────────────────────────────────────────
-    def ip_val(p):
-        return _f(p["stat"]["inningsPitched"])
+    def ipv(p):
+        return p["stat"]["ipTrue"]
 
     hot_pit_criteria = [
-        (splits("pitching", "era",        "asc"),  lambda p: _f(p["stat"]["era"], 99) <= 2.50 and ip_val(p) >= 5,
+        # ERA / runs
+        (sp("pitching","era","asc"),        lambda p: _f(p["stat"]["era"],99) <= 2.50 and ipv(p) >= PIT_MIN_IP,
          lambda p: f"{_f(p['stat']['era']):.2f} ERA"),
-        (splits("pitching", "strikeOuts", "desc"), lambda p: p["stat"]["pitcherStrikeOuts"] >= 10,
-         lambda p: f"{p['stat']['pitcherStrikeOuts']} K"),
-        (splits("pitching", "whip",       "asc"),  lambda p: _f(p["stat"]["whip"], 99) <= 0.85 and ip_val(p) >= 5,
-         lambda p: f"{_f(p['stat']['whip']):.2f} WHIP"),
-        (splits("pitching", "era",        "asc"),  lambda p: p["stat"]["earnedRuns"] == 0 and ip_val(p) >= 3,
+        (sp("pitching","era","asc"),        lambda p: p["stat"]["earnedRuns"] == 0 and ipv(p) >= PIT_MIN_IP,
          lambda p: "0 ER"),
-        (splits("pitching", "saves",      "desc"), lambda p: p["stat"]["saves"] >= 2,
+        (sp("pitching","era","asc"),        lambda p: p["stat"]["fip"] is not None and p["stat"]["fip"] <= 2.50 and ipv(p) >= PIT_MIN_IP,
+         lambda p: f"{p['stat']['fip']:.2f} FIP"),
+        # WHIP / baserunners
+        (sp("pitching","whip","asc"),       lambda p: _f(p["stat"]["whip"],99) <= 0.90 and ipv(p) >= PIT_MIN_IP,
+         lambda p: f"{_f(p['stat']['whip']):.2f} WHIP"),
+        (sp("pitching","whip","asc"),       lambda p: p["stat"]["h9"] is not None and p["stat"]["h9"] <= 5.5 and ipv(p) >= PIT_MIN_IP,
+         lambda p: f"{p['stat']['h9']:.1f} H/9"),
+        (sp("pitching","whip","asc"),       lambda p: p["stat"]["homeRunsAllowed"] == 0 and ipv(p) >= PIT_MIN_IP,
+         lambda p: "0 HR allowed"),
+        # Strikeouts
+        (sp("pitching","strikeOuts","desc"),lambda p: p["stat"]["pitcherStrikeOuts"] >= 18 and ipv(p) >= PIT_MIN_IP_REL,
+         lambda p: f"{p['stat']['pitcherStrikeOuts']} K"),
+        (sp("pitching","strikeOuts","desc"),lambda p: p["stat"]["k9"] is not None and p["stat"]["k9"] >= 12.0 and ipv(p) >= PIT_MIN_IP,
+         lambda p: f"{p['stat']['k9']:.1f} K/9"),
+        (sp("pitching","strikeOuts","desc"),lambda p: p["stat"]["kbb"] is not None and p["stat"]["kbb"] >= 4.5 and ipv(p) >= PIT_MIN_IP,
+         lambda p: f"{p['stat']['kbb']:.1f} K/BB"),
+        # Control
+        (sp("pitching","whip","asc"),       lambda p: p["stat"]["bb9"] is not None and p["stat"]["bb9"] <= 1.5 and ipv(p) >= PIT_MIN_IP,
+         lambda p: f"{p['stat']['bb9']:.1f} BB/9"),
+        # Saves
+        (sp("pitching","saves","desc"),     lambda p: p["stat"]["saves"] >= 3 and ipv(p) >= PIT_MIN_IP_REL,
          lambda p: f"{p['stat']['saves']} SV"),
+        (sp("pitching","saves","desc"),     lambda p: p["stat"]["saves"] >= 2 and _f(p["stat"]["era"],99) == 0 and ipv(p) >= PIT_MIN_IP_REL,
+         lambda p: "Perfect closer"),
     ]
 
-    hot_pit_seen = {}
-    for split_list, check, label_fn in hot_pit_criteria:
-        for split in split_list:
-            p = fmt(split)
-            if not p["id"] or not check(p):
-                continue
-            label = label_fn(p)
-            if p["id"] in hot_pit_seen:
-                if label not in hot_pit_seen[p["id"]]["reasons"]:
-                    hot_pit_seen[p["id"]]["reasons"].append(label)
-            else:
-                p["reasons"] = [label]
-                hot_pit_seen[p["id"]] = p
-
+    hot_pit_seen = apply_criteria(hot_pit_criteria)
     result["hot_pitchers"] = sorted(
         hot_pit_seen.values(),
-        key=lambda x: (-len(x["reasons"]), _f(x["stat"]["era"], 99), -x["stat"]["pitcherStrikeOuts"])
+        key=lambda x: (-len(x["reasons"]), _f(x["stat"]["era"],99), -x["stat"]["pitcherStrikeOuts"])
     )
 
     # ─────────────────────────────────────────────
-    # COLD PITCHERS
-    # Criteria (any one qualifies):
-    #   ERA >= 7.00 (3+ IP) | BB >= 6 | WHIP >= 2.00 (3+ IP)
-    #   15+ hits allowed (3+ IP) | Blown saves >= 2
+    # COLD PITCHERS — 10 criteria (14-day thresholds)
     # ─────────────────────────────────────────────
     cold_pit_criteria = [
-        (splits("pitching", "era",         "desc"), lambda p: _f(p["stat"]["era"]) >= 7.00 and ip_val(p) >= 3,
+        (sp("pitching","era","desc"),         lambda p: _f(p["stat"]["era"]) >= 6.00 and ipv(p) >= PIT_MIN_IP,
          lambda p: f"{_f(p['stat']['era']):.2f} ERA"),
-        (splits("pitching", "baseOnBalls", "desc"), lambda p: p["stat"]["walks"] >= 6,
-         lambda p: f"{p['stat']['walks']} BB"),
-        (splits("pitching", "whip",        "desc"), lambda p: _f(p["stat"]["whip"]) >= 2.00 and ip_val(p) >= 3,
+        (sp("pitching","whip","desc"),        lambda p: _f(p["stat"]["whip"]) >= 1.90 and ipv(p) >= PIT_MIN_IP,
          lambda p: f"{_f(p['stat']['whip']):.2f} WHIP"),
-        (splits("pitching", "hits",        "desc"), lambda p: p["stat"]["hitsAllowed"] >= 15 and ip_val(p) >= 3,
+        (sp("pitching","baseOnBalls","desc"), lambda p: p["stat"]["walks"] >= 10 and ipv(p) >= PIT_MIN_IP_REL,
+         lambda p: f"{p['stat']['walks']} BB"),
+        (sp("pitching","hits","desc"),        lambda p: p["stat"]["hitsAllowed"] >= 25 and ipv(p) >= PIT_MIN_IP,
          lambda p: f"{p['stat']['hitsAllowed']} H allowed"),
-        (splits("pitching", "era",         "desc"), lambda p: p["stat"]["blownSaves"] >= 2,
+        (sp("pitching","homeRuns","desc"),    lambda p: p["stat"]["homeRunsAllowed"] >= 4 and ipv(p) >= PIT_MIN_IP,
+         lambda p: f"{p['stat']['homeRunsAllowed']} HR allowed"),
+        (sp("pitching","era","desc"),         lambda p: p["stat"]["blownSaves"] >= 2 and ipv(p) >= PIT_MIN_IP_REL,
          lambda p: f"{p['stat']['blownSaves']} BS"),
+        (sp("pitching","era","desc"),         lambda p: p["stat"]["hr9"] is not None and p["stat"]["hr9"] >= 2.0 and ipv(p) >= PIT_MIN_IP,
+         lambda p: f"{p['stat']['hr9']:.1f} HR/9"),
+        (sp("pitching","whip","desc"),        lambda p: p["stat"]["bb9"] is not None and p["stat"]["bb9"] >= 4.5 and ipv(p) >= PIT_MIN_IP,
+         lambda p: f"{p['stat']['bb9']:.1f} BB/9"),
+        (sp("pitching","whip","desc"),        lambda p: p["stat"]["h9"] is not None and p["stat"]["h9"] >= 11.0 and ipv(p) >= PIT_MIN_IP,
+         lambda p: f"{p['stat']['h9']:.1f} H/9"),
+        (sp("pitching","era","desc"),         lambda p: p["stat"]["fip"] is not None and p["stat"]["fip"] >= 6.0 and ipv(p) >= PIT_MIN_IP,
+         lambda p: f"{p['stat']['fip']:.2f} FIP"),
     ]
 
-    cold_pit_seen = {}
-    for split_list, check, label_fn in cold_pit_criteria:
-        for split in split_list:
-            p = fmt(split)
-            if not p["id"] or not check(p):
-                continue
-            label = label_fn(p)
-            if p["id"] in cold_pit_seen:
-                if label not in cold_pit_seen[p["id"]]["reasons"]:
-                    cold_pit_seen[p["id"]]["reasons"].append(label)
-            else:
-                p["reasons"] = [label]
-                cold_pit_seen[p["id"]] = p
-
+    cold_pit_seen = apply_criteria(cold_pit_criteria)
     result["cold_pitchers"] = sorted(
         cold_pit_seen.values(),
-        key=lambda x: (-_f(x["stat"]["era"]), -x["stat"]["walks"])
-    )[:30]
+        key=lambda x: (-len(x["reasons"]), -_f(x["stat"]["era"]), -x["stat"]["walks"])
+    )[:35]
 
     _hot_cold_cache[days] = {"data": result, "ts": now}
     return result

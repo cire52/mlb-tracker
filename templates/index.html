@@ -2321,7 +2321,7 @@ async function showHotCold() {
 
   let data;
   try {
-    const r = await fetch('/api/hot-cold?days=7');
+    const r = await fetch('/api/hot-cold?days=14');
     data = await r.json();
   } catch(e) {
     main.innerHTML = '<div class="hub-title">🔥 Hot/Cold Players</div><div class="hub-empty">Failed to load data.</div>';
@@ -2335,19 +2335,34 @@ async function showHotCold() {
   const fmtNum = v => v ?? '—';
 
   const reasonColors = {
-    'HR': ['#ff6b35','#ff6b3522'], 'AVG': ['#4caf7d','#4caf7d22'],
-    'RBI': ['#f0c040','#f0c04022'], 'SB': ['#c84fff','#c84fff22'],
-    'OPS': ['#4a9eff','#4a9eff22'], 'SLG': ['#00c8c8','#00c8c822'],
-    'H':   ['#a0e080','#a0e08022'], 'R':  ['#ffaa00','#ffaa0022'],
-    '2B':  ['#ff88cc','#ff88cc22'],
-    'K':   ['#ff4466','#ff446622'], 'BB': ['#ff8844','#ff884422'],
-    'XBH': ['#8888ff','#8888ff22'],
-    'ERA': ['#4caf7d','#4caf7d22'], 'WHIP': ['#00c8c8','#00c8c822'],
-    'ER':  ['#4caf7d','#4caf7d22'], 'SV':  ['#f0c040','#f0c04022'],
-    'BS':  ['#ff4466','#ff446622'], 'allowed': ['#ff8844','#ff884422'],
+    'HR':    ['#ff6b35','#ff6b3522'], 'AVG':  ['#4caf7d','#4caf7d22'],
+    'RBI':   ['#f0c040','#f0c04022'], 'SB':   ['#c84fff','#c84fff22'],
+    'OPS':   ['#4a9eff','#4a9eff22'], 'SLG':  ['#00c8c8','#00c8c822'],
+    'OBP':   ['#44ddaa','#44ddaa22'], 'ISO':  ['#ff9933','#ff993322'],
+    'H':     ['#a0e080','#a0e08022'], 'R':    ['#ffaa00','#ffaa0022'],
+    '2B':    ['#ff88cc','#ff88cc22'], '3B':   ['#ff66bb','#ff66bb22'],
+    'XBH':   ['#8888ff','#8888ff22'],
+    'BB%':   ['#55aaff','#55aaff22'], 'K%':   ['#ff5577','#ff557722'],
+    'K':     ['#ff4466','#ff446622'], 'BB':   ['#ff8844','#ff884422'],
+    'ERA':   ['#4caf7d','#4caf7d22'], 'WHIP': ['#00c8c8','#00c8c822'],
+    'FIP':   ['#66ddff','#66ddff22'], 'K/9':  ['#ff6688','#ff668822'],
+    'BB/9':  ['#ff9955','#ff995522'], 'H/9':  ['#aa88ff','#aa88ff22'],
+    'HR/9':  ['#ff4444','#ff444422'], 'K/BB': ['#44ffcc','#44ffcc22'],
+    'ER':    ['#4caf7d','#4caf7d22'], 'SV':   ['#f0c040','#f0c04022'],
+    'BS':         ['#ff4466','#ff446622'],
+    'HR allowed': ['#ff4444','#ff444422'],
+    'H allowed':  ['#ff8844','#ff884422'],
+    'Perfect':    ['#f0c040','#f0c04022'],
+    '0 Power':    ['#667799','#66779922'],
+    '0 XBH':      ['#667799','#66779922'],
+    '0 ER':       ['#4caf7d','#4caf7d22'],
+    '0 HR':       ['#4caf7d','#4caf7d22'],
+    '0 BB':       ['#ff5577','#ff557722'],
   };
   const getBadgeColor = (reason, isHot) => {
-    for (const [key, colors] of Object.entries(reasonColors)) {
+    // Check multi-word keys first (longer matches take priority)
+    const sorted = Object.entries(reasonColors).sort((a,b) => b[0].length - a[0].length);
+    for (const [key, colors] of sorted) {
       if (reason.endsWith(key) || reason.includes(key)) return colors;
     }
     return isHot ? ['#4caf7d','#4caf7d22'] : ['#4a9eff','#4a9eff22'];
@@ -2363,16 +2378,24 @@ async function showHotCold() {
       return `<span style="font-size:0.65rem;font-weight:700;padding:2px 7px;border-radius:10px;background:${bg};color:${fg};white-space:nowrap">${esc(r)}</span>`;
     }).join(' ');
     const statLine = [
-      `<span title="Avg">${fmtAvg(s.avg)}</span>`,
-      `<span title="AB">${fmtNum(s.atBats)} AB</span>`,
+      `<span title="Batting Average">${fmtAvg(s.avg)}</span>`,
+      s.obp  ? `<span title="On-Base %">OBP ${parseFloat(s.obp).toFixed(3)}</span>` : '',
+      s.slg  ? `<span title="Slugging">SLG ${parseFloat(s.slg).toFixed(3)}</span>` : '',
+      s.ops  ? `<span title="OPS">OPS ${parseFloat(s.ops).toFixed(3)}</span>` : '',
+      s.iso != null ? `<span title="Isolated Power">ISO ${s.iso.toFixed(3)}</span>` : '',
+      `<span title="At Bats">${fmtNum(s.atBats)} AB</span>`,
       `<span title="Hits">${fmtNum(s.hits)} H</span>`,
-      `<span title="HR">${fmtNum(s.homeRuns)} HR</span>`,
+      s.doubles > 0 ? `<span title="Doubles">${fmtNum(s.doubles)} 2B</span>` : '',
+      s.triples > 0 ? `<span title="Triples">${fmtNum(s.triples)} 3B</span>` : '',
+      `<span title="Home Runs">${fmtNum(s.homeRuns)} HR</span>`,
       `<span title="RBI">${fmtNum(s.rbi)} RBI</span>`,
-      `<span title="R">${fmtNum(s.runs)} R</span>`,
-      `<span title="SB">${fmtNum(s.stolenBases)} SB</span>`,
-      `<span title="BB">${fmtNum(s.baseOnBalls)} BB</span>`,
-      `<span title="K">${fmtNum(s.strikeOuts)} K</span>`,
-    ].join('<span style="color:#333;margin:0 3px">·</span>');
+      `<span title="Runs">${fmtNum(s.runs)} R</span>`,
+      s.stolenBases > 0 ? `<span title="Stolen Bases">${fmtNum(s.stolenBases)} SB</span>` : '',
+      `<span title="Walks">${fmtNum(s.baseOnBalls)} BB</span>`,
+      `<span title="Strikeouts">${fmtNum(s.strikeOuts)} K</span>`,
+      s.bbPct != null ? `<span title="Walk Rate">BB% ${(s.bbPct*100).toFixed(1)}%</span>` : '',
+      s.kPct  != null ? `<span title="Strikeout Rate">K% ${(s.kPct*100).toFixed(1)}%</span>` : '',
+    ].filter(Boolean).join('<span style="color:#333;margin:0 3px">·</span>');
     return `<div style="padding:10px 12px;background:#0c0d11;border:1px solid #404862;border-radius:8px;margin-bottom:6px">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
         <img src="${headshot}" onerror="this.src='${GENERIC_HEADSHOT}'" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0">
@@ -2396,15 +2419,28 @@ async function showHotCold() {
       const [fg, bg] = getBadgeColor(r, isHot);
       return `<span style="font-size:0.65rem;font-weight:700;padding:2px 7px;border-radius:10px;background:${bg};color:${fg};white-space:nowrap">${esc(r)}</span>`;
     }).join(' ');
+    const fip = s.fip != null ? parseFloat(s.fip).toFixed(2) : '—';
+    const k9  = s.k9  != null ? parseFloat(s.k9).toFixed(1)  : null;
+    const bb9 = s.bb9 != null ? parseFloat(s.bb9).toFixed(1) : null;
+    const h9  = s.h9  != null ? parseFloat(s.h9).toFixed(1)  : null;
+    const hr9 = s.hr9 != null ? parseFloat(s.hr9).toFixed(2) : null;
+    const kbb = s.kbb != null ? parseFloat(s.kbb).toFixed(2) : null;
     const statLine = [
-      `<span>ERA ${era}</span>`,
-      `<span>${fmtNum(s.inningsPitched)} IP</span>`,
-      `<span>${fmtNum(s.pitcherStrikeOuts)} K</span>`,
-      `<span>${fmtNum(s.walks)} BB</span>`,
-      `<span>${fmtNum(s.earnedRuns)} ER</span>`,
-      `<span>WHIP ${whip}</span>`,
-      s.saves > 0 ? `<span>${fmtNum(s.saves)} SV</span>` : '',
-      s.hitsAllowed > 0 ? `<span>${fmtNum(s.hitsAllowed)} H</span>` : '',
+      `<span title="ERA">ERA ${era}</span>`,
+      `<span title="FIP">FIP ${fip}</span>`,
+      `<span title="Innings Pitched">${s.inningsPitched} IP</span>`,
+      `<span title="Strikeouts">${fmtNum(s.pitcherStrikeOuts)} K</span>`,
+      `<span title="Walks">${fmtNum(s.walks)} BB</span>`,
+      `<span title="Earned Runs">${fmtNum(s.earnedRuns)} ER</span>`,
+      `<span title="WHIP">WHIP ${whip}</span>`,
+      k9  ? `<span title="Strikeouts per 9">K/9 ${k9}</span>`   : '',
+      bb9 ? `<span title="Walks per 9">BB/9 ${bb9}</span>`      : '',
+      h9  ? `<span title="Hits per 9">H/9 ${h9}</span>`         : '',
+      hr9 ? `<span title="HR per 9">HR/9 ${hr9}</span>`         : '',
+      kbb ? `<span title="K/BB ratio">K/BB ${kbb}</span>`       : '',
+      s.saves > 0 ? `<span title="Saves">${fmtNum(s.saves)} SV</span>` : '',
+      s.hitsAllowed > 0 ? `<span title="Hits Allowed">${fmtNum(s.hitsAllowed)} H</span>` : '',
+      s.homeRunsAllowed > 0 ? `<span title="HR Allowed">${fmtNum(s.homeRunsAllowed)} HR</span>` : '',
     ].filter(Boolean).join('<span style="color:#333;margin:0 3px">·</span>');
     return `<div style="padding:10px 12px;background:#0c0d11;border:1px solid #404862;border-radius:8px;margin-bottom:6px">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
@@ -2439,7 +2475,7 @@ async function showHotCold() {
   const emptyMsg = `<div class="hub-empty" style="padding-top:60px">No regular season data yet.<br><span style="font-size:0.8rem;color:#444">Check back when the regular season starts.</span></div>`;
 
   main.innerHTML = `
-    <div class="hub-title">🔥 Hot/Cold Players <span style="font-size:0.75rem;font-weight:400;color:#555;margin-left:8px">Last 7 Days</span></div>
+    <div class="hub-title">🔥 Hot/Cold Players <span style="font-size:0.75rem;font-weight:400;color:#555;margin-left:8px">Last 14 Days</span></div>
     <div style="display:flex;gap:0;border-bottom:1px solid #404862;margin-bottom:16px">
       <button id="hcTabHitters" onclick="switchHCTab('hitters')" style="${tabStyle(true)}">Hitters</button>
       <button id="hcTabPitchers" onclick="switchHCTab('pitchers')" style="${tabStyle(false)}">Pitchers</button>
