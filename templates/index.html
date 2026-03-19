@@ -2334,12 +2334,34 @@ async function showHotCold() {
   const fmtAvg = v => v != null ? parseFloat(v).toFixed(3).replace(/^0/, '') : '—';
   const fmtNum = v => v ?? '—';
 
+  const reasonColors = {
+    'HR': ['#ff6b35','#ff6b3522'], 'AVG': ['#4caf7d','#4caf7d22'],
+    'RBI': ['#f0c040','#f0c04022'], 'SB': ['#c84fff','#c84fff22'],
+    'OPS': ['#4a9eff','#4a9eff22'], 'SLG': ['#00c8c8','#00c8c822'],
+    'H':   ['#a0e080','#a0e08022'], 'R':  ['#ffaa00','#ffaa0022'],
+    '2B':  ['#ff88cc','#ff88cc22'],
+    'K':   ['#ff4466','#ff446622'], 'BB': ['#ff8844','#ff884422'],
+    'XBH': ['#8888ff','#8888ff22'],
+    'ERA': ['#4caf7d','#4caf7d22'], 'WHIP': ['#00c8c8','#00c8c822'],
+    'ER':  ['#4caf7d','#4caf7d22'], 'SV':  ['#f0c040','#f0c04022'],
+    'BS':  ['#ff4466','#ff446622'], 'allowed': ['#ff8844','#ff884422'],
+  };
+  const getBadgeColor = (reason, isHot) => {
+    for (const [key, colors] of Object.entries(reasonColors)) {
+      if (reason.endsWith(key) || reason.includes(key)) return colors;
+    }
+    return isHot ? ['#4caf7d','#4caf7d22'] : ['#4a9eff','#4a9eff22'];
+  };
+
   const renderHitterRow = (p, isHot) => {
     const s = p.stat;
     const headshot = `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/${p.id}/headshot/67/current`;
     const logo = p.team_id ? `<img src="https://www.mlbstatic.com/team-logos/${p.team_id}.svg" onerror="this.style.display='none'" style="width:16px;height:16px;object-fit:contain;flex-shrink:0">` : '';
     const tracked = trackedIds.has(p.id) ? '<span style="color:#c8102e;font-size:0.68rem;margin-left:4px">●</span>' : '';
-    const reasons = (p.reasons || []).map(r => `<span style="font-size:0.65rem;font-weight:700;padding:1px 6px;border-radius:10px;background:${isHot?'#4caf7d22':'#4a9eff22'};color:${isHot?'#4caf7d':'#4a9eff'}">${esc(r)}</span>`).join('');
+    const reasons = (p.reasons || []).map(r => {
+      const [fg, bg] = getBadgeColor(r, isHot);
+      return `<span style="font-size:0.65rem;font-weight:700;padding:2px 7px;border-radius:10px;background:${bg};color:${fg};white-space:nowrap">${esc(r)}</span>`;
+    }).join(' ');
     const statLine = [
       `<span title="Avg">${fmtAvg(s.avg)}</span>`,
       `<span title="AB">${fmtNum(s.atBats)} AB</span>`,
@@ -2370,6 +2392,10 @@ async function showHotCold() {
     const tracked = trackedIds.has(p.id) ? '<span style="color:#c8102e;font-size:0.68rem;margin-left:4px">●</span>' : '';
     const era = s.era != null ? parseFloat(s.era).toFixed(2) : '—';
     const whip = s.whip != null ? parseFloat(s.whip).toFixed(2) : '—';
+    const pitReasons = (p.reasons || []).map(r => {
+      const [fg, bg] = getBadgeColor(r, isHot);
+      return `<span style="font-size:0.65rem;font-weight:700;padding:2px 7px;border-radius:10px;background:${bg};color:${fg};white-space:nowrap">${esc(r)}</span>`;
+    }).join(' ');
     const statLine = [
       `<span>ERA ${era}</span>`,
       `<span>${fmtNum(s.inningsPitched)} IP</span>`,
@@ -2377,12 +2403,14 @@ async function showHotCold() {
       `<span>${fmtNum(s.walks)} BB</span>`,
       `<span>${fmtNum(s.earnedRuns)} ER</span>`,
       `<span>WHIP ${whip}</span>`,
-    ].join('<span style="color:#333;margin:0 3px">·</span>');
+      s.saves > 0 ? `<span>${fmtNum(s.saves)} SV</span>` : '',
+      s.hitsAllowed > 0 ? `<span>${fmtNum(s.hitsAllowed)} H</span>` : '',
+    ].filter(Boolean).join('<span style="color:#333;margin:0 3px">·</span>');
     return `<div style="padding:10px 12px;background:#0c0d11;border:1px solid #404862;border-radius:8px;margin-bottom:6px">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
         <img src="${headshot}" onerror="this.src='${GENERIC_HEADSHOT}'" style="width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0">
         <div style="flex:1;min-width:0">
-          <div style="font-size:0.88rem;font-weight:700;color:#e0e0e0">${esc(p.name)}${tracked}</div>
+          <div style="font-size:0.88rem;font-weight:700;color:#e0e0e0">${esc(p.name)}${tracked} ${pitReasons}</div>
           <div style="display:flex;align-items:center;gap:4px;margin-top:2px">${logo}<span style="font-size:0.72rem;color:#666">${esc(p.team)}</span></div>
         </div>
       </div>
