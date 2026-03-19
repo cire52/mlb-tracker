@@ -1959,7 +1959,10 @@ async function showVideoHub() {
     )
   );
 
-  const allVideos = results.flat().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const allVideos = results.flat()
+    .filter(v => !v.date || v.date >= oneWeekAgo)
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   let html = '<div class="hub-title">🎬 Video Hub</div>';
 
   if (!allVideos.length) {
