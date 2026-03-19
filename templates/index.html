@@ -2175,22 +2175,30 @@ async function showProbablePitchers() {
   const twoStartPitchers = [];
   const seen = new Set();
   for (const g of games) {
-    for (const pp of [g.away_pitcher, g.home_pitcher]) {
+    for (const [pp, teamId, teamName] of [[g.away_pitcher, g.away_team_id, g.away_team], [g.home_pitcher, g.home_team_id, g.home_team]]) {
       if (!pp?.id || seen.has(pp.id)) continue;
       seen.add(pp.id);
       if ((weekStarts[pp.id]?.[thisWeek] || 0) >= 2) {
-        // Find both their start dates this week
         const starts = games
           .filter(x => getWeekKey(x.date) === thisWeek && (x.away_pitcher?.id === pp.id || x.home_pitcher?.id === pp.id))
           .map(x => x.date);
-        twoStartPitchers.push({ ...pp, starts });
+        twoStartPitchers.push({ ...pp, teamId, teamName, starts });
       }
     }
   }
   twoStartPitchers.sort((a, b) => a.name.localeCompare(b.name));
 
-  const renderPitcher = (pp, side) => {
-    if (!pp) return `<div style="flex:1;padding:8px 10px;background:#0f1117;border-radius:6px;color:#444;font-size:0.82rem;font-style:italic">TBD</div>`;
+  const teamLogo = (teamId) => `https://www.mlbstatic.com/team-logos/${teamId}.svg`;
+
+  const renderPitcher = (pp, side, teamId, teamName) => {
+    const logo = teamId ? `<img src="${teamLogo(teamId)}" onerror="this.style.display='none'" style="width:22px;height:22px;object-fit:contain;flex-shrink:0">` : '';
+    if (!pp) return `<div style="flex:1;display:flex;align-items:center;gap:8px;padding:8px 10px;background:#0f1117;border-radius:6px;border:1px solid #2a2f3e">
+      ${logo}
+      <div style="min-width:0">
+        <div style="font-size:0.82rem;color:#444;font-style:italic">TBD</div>
+        ${teamName ? `<div style="font-size:0.7rem;color:#444">${esc(teamName)}</div>` : ''}
+      </div>
+    </div>`;
     const isDouble = startCount[pp.id] >= 2;
     const isTracked = trackedIds.has(pp.id);
     const headshot = `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/${pp.id}/headshot/67/current`;
@@ -2199,9 +2207,12 @@ async function showProbablePitchers() {
     const trackedDot = isTracked ? '<span style="color:#c8102e;font-size:0.7rem;margin-left:4px">●</span>' : '';
     return `<div style="flex:1;display:flex;align-items:center;gap:8px;padding:8px 10px;background:#141820;border-radius:6px;${border}">
       <img src="${headshot}" onerror="this.src='${GENERIC_HEADSHOT}'" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0">
-      <div style="min-width:0">
+      <div style="min-width:0;flex:1">
         <div style="font-size:0.85rem;font-weight:600;color:#e0e0e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(pp.name)}${trackedDot}${badge}</div>
-        <div style="font-size:0.72rem;color:#555">${side}</div>
+        <div style="display:flex;align-items:center;gap:4px;margin-top:2px">
+          ${logo}
+          <span style="font-size:0.72rem;color:#555">${side}</span>
+        </div>
         ${pp.note ? `<div style="font-size:0.7rem;color:#666;margin-top:1px">${esc(pp.note)}</div>` : ''}
       </div>
     </div>`;
@@ -2220,9 +2231,9 @@ async function showProbablePitchers() {
       <div style="display:flex;flex-direction:column;gap:6px">`;
     for (const g of byDate[date]) {
       allGamesHtml += `<div style="display:flex;align-items:center;gap:6px">
-        ${renderPitcher(g.away_pitcher, esc(g.away_team) + ' (Away)')}
+        ${renderPitcher(g.away_pitcher, esc(g.away_team) + ' (Away)', g.away_team_id, g.away_team)}
         <div style="font-size:0.72rem;color:#444;white-space:nowrap;flex-shrink:0">@</div>
-        ${renderPitcher(g.home_pitcher, esc(g.home_team) + ' (Home)')}
+        ${renderPitcher(g.home_pitcher, esc(g.home_team) + ' (Home)', g.home_team_id, g.home_team)}
       </div>`;
     }
     allGamesHtml += '</div></div>';
@@ -2241,10 +2252,13 @@ async function showProbablePitchers() {
         const dt = new Date(s + 'T12:00:00');
         return dt.toLocaleDateString('en-US', {weekday:'short', month:'short', day:'numeric'});
       }).join(' & ');
+      const logo = pp.teamId ? `<img src="${teamLogo(pp.teamId)}" onerror="this.style.display='none'" style="width:28px;height:28px;object-fit:contain;flex-shrink:0">` : '';
       twoStartHtml += `<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:#141820;border:1.5px solid #4a9eff;border-radius:8px">
         <img src="${headshot}" onerror="this.src='${GENERIC_HEADSHOT}'" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0">
+        ${logo}
         <div style="flex:1;min-width:0">
           <div style="font-size:0.95rem;font-weight:700;color:#e0e0e0">${esc(pp.name)}${isTracked ? '<span style="color:#c8102e;font-size:0.7rem;margin-left:6px">● On roster</span>' : ''}</div>
+          <div style="font-size:0.78rem;color:#555;margin-top:1px">${esc(pp.teamName || '')}</div>
           <div style="font-size:0.78rem;color:#4a9eff;margin-top:2px">Starts: ${esc(dateLabels)}</div>
         </div>
         <span style="background:#4a9eff22;color:#4a9eff;border-radius:6px;padding:3px 10px;font-size:0.78rem;font-weight:700;flex-shrink:0">2 starts</span>
