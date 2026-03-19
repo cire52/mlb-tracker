@@ -183,6 +183,7 @@
 
   /* Main area */
   .main { flex: 1; overflow-y: auto; padding: 24px; }
+  .pp-date-sticky { position: sticky; top: 0; z-index: 10; background: #0f1117; margin: 0 -24px; padding: 10px 24px 8px; border-bottom: 2px solid #c8102e; margin-bottom: 10px; }
   .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #444; gap: 12px; }
   .empty-state .icon { font-size: 3rem; }
   .empty-state p { font-size: 1rem; }
@@ -382,6 +383,7 @@
     .sidebar.open { left: 0; box-shadow: 4px 0 24px rgba(0,0,0,0.5); }
     .sidebar-overlay.open { display: block; }
     .main { padding: 14px; width: 100%; }
+    .pp-date-sticky { margin: 0 -14px; padding: 10px 14px 8px; }
     .player-header { padding: 14px; gap: 12px; }
     .player-header img.big-headshot { width: 58px; height: 58px; }
     .player-header h2 { font-size: 1.2rem; }
@@ -2227,7 +2229,7 @@ async function showProbablePitchers() {
     const d = new Date(date + 'T12:00:00');
     const label = d.toLocaleDateString('en-US', {weekday:'long', month:'short', day:'numeric'});
     allGamesHtml += `<div style="margin-bottom:28px">
-      <div style="position:sticky;top:0;z-index:10;background:#0b0e14;padding:10px 0 8px;margin-bottom:10px;border-bottom:2px solid #c8102e">
+      <div class="pp-date-sticky">
         <span style="font-size:0.95rem;font-weight:800;color:#e0e0e0;text-transform:uppercase;letter-spacing:0.8px">${esc(label)}</span>
       </div>
       <div style="display:flex;flex-direction:column;gap:6px">`;
