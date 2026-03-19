@@ -2226,8 +2226,10 @@ async function showProbablePitchers() {
   for (const date of Object.keys(byDate).sort()) {
     const d = new Date(date + 'T12:00:00');
     const label = d.toLocaleDateString('en-US', {weekday:'long', month:'short', day:'numeric'});
-    allGamesHtml += `<div style="margin-bottom:20px">
-      <div style="font-size:0.78rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:0.5px;padding:6px 0;border-bottom:1px solid #2a2f3e;margin-bottom:8px">${esc(label)}</div>
+    allGamesHtml += `<div style="margin-bottom:28px">
+      <div style="position:sticky;top:0;z-index:10;background:#0b0e14;padding:10px 0 8px;margin-bottom:10px;border-bottom:2px solid #c8102e">
+        <span style="font-size:0.95rem;font-weight:800;color:#e0e0e0;text-transform:uppercase;letter-spacing:0.8px">${esc(label)}</span>
+      </div>
       <div style="display:flex;flex-direction:column;gap:6px">`;
     for (const g of byDate[date]) {
       allGamesHtml += `<div style="display:flex;align-items:center;gap:6px">
