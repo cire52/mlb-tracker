@@ -1102,6 +1102,62 @@ def get_player_videos(player_id, season=None, limit=5):
     return videos
 
 
+_probable_cache = {}
+PROBABLE_CACHE_TTL = 1800  # 30 min
+
+def get_probable_pitchers(days=7):
+    """Fetch probable pitchers for the next `days` days from the MLB schedule API."""
+    now = time.time()
+    if _probable_cache.get("data") and now - _probable_cache["ts"] < PROBABLE_CACHE_TTL:
+        return _probable_cache["data"]
+
+    today = datetime.date.today()
+    end = today + datetime.timedelta(days=days - 1)
+    url = (f"{BASE}/schedule?sportId=1&startDate={today}&endDate={end}"
+           f"&hydrate=probablePitcher(note),team&gameType=R,S")
+    try:
+        r = requests.get(url, timeout=10)
+        r.raise_for_status()
+        data = r.json()
+    except Exception as e:
+        print(f"[probable] fetch error: {e}")
+        return []
+
+    games = []
+    for date_entry in data.get("dates", []):
+        date_str = date_entry.get("date", "")
+        for game in date_entry.get("games", []):
+            status = game.get("status", {}).get("abstractGameState", "")
+            if status == "Final":
+                continue
+            away = game.get("teams", {}).get("away", {})
+            home = game.get("teams", {}).get("home", {})
+            away_pp = away.get("probablePitcher")
+            home_pp = home.get("probablePitcher")
+            games.append({
+                "date": date_str,
+                "game_pk": game.get("gamePk"),
+                "away_team": away.get("team", {}).get("name", ""),
+                "away_team_id": away.get("team", {}).get("id"),
+                "home_team": home.get("team", {}).get("name", ""),
+                "home_team_id": home.get("team", {}).get("id"),
+                "away_pitcher": {
+                    "id": away_pp.get("id"),
+                    "name": away_pp.get("fullName", ""),
+                    "note": away_pp.get("note", ""),
+                } if away_pp else None,
+                "home_pitcher": {
+                    "id": home_pp.get("id"),
+                    "name": home_pp.get("fullName", ""),
+                    "note": home_pp.get("note", ""),
+                } if home_pp else None,
+            })
+
+    _probable_cache["data"] = games
+    _probable_cache["ts"] = now
+    return games
+
+
 def clear_cache():
     _cache.clear()
     _savant_xstats_cache.clear()
@@ -1113,3 +1169,4 @@ def clear_cache():
     _fangraphs_cache.clear()
     _milb_cache.clear()
     _video_cache.clear()
+    _probable_cache.clear()

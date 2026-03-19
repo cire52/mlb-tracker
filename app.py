@@ -5,7 +5,7 @@ from mlb_api import (search_players, get_game_log, get_player_info, clear_cache,
                      get_season_totals, get_player_transactions, get_xstats, get_pitch_mix,
                      get_statcast, get_nbc_news, get_career_stats, get_minor_league_stats,
                      get_schedule, get_splits, get_fangraphs_stats, import_fantrax_url,
-                     get_player_videos)
+                     get_player_videos, get_probable_pitchers)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "clubhouse-dev-key-please-set-SECRET_KEY-env")
@@ -492,6 +492,12 @@ def player_videos(player_id):
     season = request.args.get("season")
     kwargs = {"season": int(season)} if season else {}
     return jsonify(get_player_videos(player_id, **kwargs))
+
+
+@app.route("/api/probable-pitchers")
+def probable_pitchers():
+    days = int(request.args.get("days", 7))
+    return jsonify(get_probable_pitchers(days=days))
 
 
 @app.route("/api/refresh", methods=["POST"])

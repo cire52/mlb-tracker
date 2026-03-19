@@ -404,6 +404,7 @@
     <button class="hdr-btn" id="hubNewsBtn" onclick="showNewsHub()">📰 News</button>
     <button class="hdr-btn" id="hubVideoBtn" onclick="showVideoHub()">🎬 Videos</button>
     <button class="hdr-btn" id="hubStatcastBtn" onclick="showStatcastDb()">📡 Statcast</button>
+    <button class="hdr-btn" id="hubProbableBtn" onclick="showProbablePitchers()">⚾ Probable Pitchers</button>
     <div class="hdr-divider"></div>
     <div class="hdr-sport-toggle">
       <button class="hdr-sport-btn active" id="btnSpring" onclick="setSport('S')">🌵 Spring</button>
@@ -461,6 +462,7 @@
         <button class="mob-footer-btn" id="mobHubNewsBtn" onclick="showNewsHub()">📰 News</button>
         <button class="mob-footer-btn" id="mobHubVideoBtn" onclick="showVideoHub()">🎬 Videos</button>
         <button class="mob-footer-btn" id="mobHubStatcastBtn" onclick="showStatcastDb()">📡 Statcast</button>
+        <button class="mob-footer-btn" id="mobHubProbableBtn" onclick="showProbablePitchers()">⚾ Probable</button>
       </div>
       <div class="mob-sport-row">
         <button class="mob-sport-btn active" id="mobBtnSpring" onclick="setSport('S')">🌵 Spring</button>
@@ -2106,6 +2108,93 @@ async function scDbLoadPlayer(player) {
   }
 }
 
+/* ── Probable Pitchers Hub ── */
+async function showProbablePitchers() {
+  currentHub = 'probable';
+  activePlayerId = null;
+  renderPlayerList();
+  if (window.innerWidth <= 768) {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebarOverlay').classList.remove('open');
+  }
+  const main = document.getElementById('main');
+  main.innerHTML = '<div class="hub-title">⚾ Probable Pitchers</div><div class="loading">Loading…</div>';
+
+  let games;
+  try {
+    const r = await fetch('/api/probable-pitchers?days=7');
+    games = await r.json();
+  } catch(e) {
+    main.innerHTML = '<div class="hub-title">⚾ Probable Pitchers</div><div class="hub-empty">Failed to load probable pitchers.</div>';
+    return;
+  }
+
+  if (!games.length) {
+    main.innerHTML = '<div class="hub-title">⚾ Probable Pitchers</div><div class="hub-empty">No probable pitchers announced yet.</div>';
+    return;
+  }
+
+  // Count starts per pitcher this week
+  const startCount = {};
+  for (const g of games) {
+    if (g.away_pitcher?.id) startCount[g.away_pitcher.id] = (startCount[g.away_pitcher.id] || 0) + 1;
+    if (g.home_pitcher?.id) startCount[g.home_pitcher.id] = (startCount[g.home_pitcher.id] || 0) + 1;
+  }
+
+  // Group by date
+  const byDate = {};
+  for (const g of games) {
+    if (!byDate[g.date]) byDate[g.date] = [];
+    byDate[g.date].push(g);
+  }
+
+  const trackedIds = new Set(trackedPlayers.map(p => p.id));
+
+  let html = '<div class="hub-title">⚾ Probable Pitchers <span style="font-size:0.75rem;font-weight:400;color:#555;margin-left:8px">Next 7 Days</span></div>';
+  html += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;font-size:0.78rem;color:#666">'
+    + '<span><span style="color:#4a9eff;font-weight:700">●</span> 2 starts this week</span>'
+    + '<span><span style="color:#c8102e;font-weight:700">●</span> On your roster</span>'
+    + '</div>';
+
+  for (const date of Object.keys(byDate).sort()) {
+    const d = new Date(date + 'T12:00:00');
+    const label = d.toLocaleDateString('en-US', {weekday:'long', month:'short', day:'numeric'});
+    html += `<div style="margin-bottom:20px">
+      <div style="font-size:0.78rem;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:0.5px;padding:6px 0;border-bottom:1px solid #2a2f3e;margin-bottom:8px">${esc(label)}</div>
+      <div style="display:flex;flex-direction:column;gap:6px">`;
+
+    for (const g of byDate[date]) {
+      const renderPitcher = (pp, side) => {
+        if (!pp) return `<div style="flex:1;padding:8px 10px;background:#0f1117;border-radius:6px;color:#444;font-size:0.82rem;font-style:italic">TBD</div>`;
+        const isDouble = startCount[pp.id] >= 2;
+        const isTracked = trackedIds.has(pp.id);
+        const headshot = `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/${pp.id}/headshot/67/current`;
+        let border = isDouble ? 'border:1.5px solid #4a9eff' : isTracked ? 'border:1.5px solid #c8102e33' : 'border:1px solid #2a2f3e';
+        let badge = isDouble ? '<span style="font-size:0.68rem;background:#4a9eff22;color:#4a9eff;border-radius:4px;padding:1px 5px;font-weight:700;margin-left:4px">2 starts</span>' : '';
+        let trackedDot = isTracked ? '<span style="color:#c8102e;font-size:0.7rem;margin-left:4px">●</span>' : '';
+        return `<div style="flex:1;display:flex;align-items:center;gap:8px;padding:8px 10px;background:#141820;border-radius:6px;${border}">
+          <img src="${headshot}" onerror="this.src='${GENERIC_HEADSHOT}'" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0">
+          <div style="min-width:0">
+            <div style="font-size:0.85rem;font-weight:600;color:#e0e0e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(pp.name)}${trackedDot}${badge}</div>
+            <div style="font-size:0.72rem;color:#555">${side}</div>
+            ${pp.note ? `<div style="font-size:0.7rem;color:#666;margin-top:1px">${esc(pp.note)}</div>` : ''}
+          </div>
+        </div>`;
+      };
+
+      html += `<div style="display:flex;align-items:center;gap:6px">
+        ${renderPitcher(g.away_pitcher, esc(g.away_team) + ' (Away)')}
+        <div style="font-size:0.72rem;color:#444;white-space:nowrap;flex-shrink:0">@</div>
+        ${renderPitcher(g.home_pitcher, esc(g.home_team) + ' (Home)')}
+      </div>`;
+    }
+
+    html += '</div></div>';
+  }
+
+  main.innerHTML = html;
+}
+
 async function refreshData() {
   await fetch('/api/refresh', {method:'POST'});
   trackedPlayers.forEach(p => {delete p.ilStatus;});
@@ -2114,6 +2203,7 @@ async function refreshData() {
   else if (currentHub === 'news') showNewsHub();
   else if (currentHub === 'video') showVideoHub();
   else if (currentHub === 'statcast') showStatcastDb();
+  else if (currentHub === 'probable') showProbablePitchers();
   else if (activePlayerId) showStats(activePlayerId);
   loadILStatuses();
 }
