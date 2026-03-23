@@ -2152,9 +2152,10 @@ async function showProbablePitchers() {
     mon.setDate(d.getDate() - daysToMon);
     return mon.toISOString().slice(0, 10);
   }
-  // {pitcherId: {weekKey: count}}
+  // {pitcherId: {weekKey: count}} — regular season games only
   const weekStarts = {};
   for (const g of games) {
+    if (g.game_type === 'S') continue;
     const wk = getWeekKey(g.date);
     for (const pp of [g.away_pitcher, g.home_pitcher]) {
       if (!pp?.id) continue;
@@ -2188,7 +2189,7 @@ async function showProbablePitchers() {
       seen.add(pp.id);
       if ((weekStarts[pp.id]?.[thisWeek] || 0) >= 2) {
         const starts = games
-          .filter(x => getWeekKey(x.date) === thisWeek && (x.away_pitcher?.id === pp.id || x.home_pitcher?.id === pp.id))
+          .filter(x => x.game_type !== 'S' && getWeekKey(x.date) === thisWeek && (x.away_pitcher?.id === pp.id || x.home_pitcher?.id === pp.id))
           .map(x => x.date);
         twoStartPitchers.push({ ...pp, teamId, teamName, starts });
       }

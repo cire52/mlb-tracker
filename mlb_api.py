@@ -1137,6 +1137,7 @@ def get_probable_pitchers(days=7):
             games.append({
                 "date": date_str,
                 "game_pk": game.get("gamePk"),
+                "game_type": game.get("gameType", "R"),
                 "away_team": away.get("team", {}).get("name", ""),
                 "away_team_id": away.get("team", {}).get("id"),
                 "home_team": home.get("team", {}).get("name", ""),
