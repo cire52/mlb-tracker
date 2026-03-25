@@ -2217,7 +2217,7 @@ async function showProbablePitchers() {
         ${teamName ? `<div style="font-size:0.7rem;color:#444">${esc(teamName)}</div>` : ''}
       </div>
     </div>`;
-    const isDouble = startCount[pp.id] >= 2;
+    const isDouble = (weekStarts[pp.id]?.[thisWeek] || 0) >= 2;
     const isTracked = trackedIds.has(pp.id);
     const headshot = `https://img.mlbstatic.com/mlb-photos/image/upload/d_people:generic:headshot:67:current.png/w_213,q_auto:best/v1/people/${pp.id}/headshot/67/current`;
     const border = isDouble ? 'border:1.5px solid #4a9eff' : isTracked ? 'border:1.5px solid #c8102e33' : 'border:1px solid #404862';
@@ -2236,12 +2236,12 @@ async function showProbablePitchers() {
     </div>`;
   };
 
-  // Build all-games panel
+  // Build all-games panel — only show the fantasy week (Mon–Sun)
   let allGamesHtml = '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;font-size:0.78rem;color:#666">'
     + '<span><span style="color:#4a9eff;font-weight:700">●</span> 2 starts this week</span>'
     + '<span><span style="color:#c8102e;font-weight:700">●</span> On your roster</span>'
     + '</div>';
-  for (const date of Object.keys(byDate).sort()) {
+  for (const date of Object.keys(byDate).sort().filter(d => getWeekKey(d) === thisWeek)) {
     const d = new Date(date + 'T12:00:00');
     const label = d.toLocaleDateString('en-US', {weekday:'long', month:'short', day:'numeric'});
     allGamesHtml += `<div style="margin-bottom:28px">
