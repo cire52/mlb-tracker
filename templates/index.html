@@ -2147,7 +2147,7 @@ async function showProbablePitchers() {
 
   let games;
   try {
-    const r = await fetch('/api/probable-pitchers?days=14');
+    const r = await fetch('/api/probable-pitchers?days=16');
     games = await r.json();
   } catch(e) {
     main.innerHTML = '<div class="hub-title">⚾ Probable Pitchers</div><div class="hub-empty">Failed to load probable pitchers.</div>';
@@ -2253,13 +2253,14 @@ async function showProbablePitchers() {
     </div>`;
   };
 
-  // Current week dates + following Mon & Tue as a preview
-  const thisWeekDate = new Date(thisWeek + 'T12:00:00');
-  const nextMonDate = new Date(thisWeekDate); nextMonDate.setDate(thisWeekDate.getDate() + 7);
-  const nextTueDate = new Date(thisWeekDate); nextTueDate.setDate(thisWeekDate.getDate() + 8);
-  const nextMonStr = nextMonDate.toISOString().slice(0,10);
-  const nextTueStr = nextTueDate.toISOString().slice(0,10);
-  const previewDates = new Set([nextMonStr, nextTueStr]);
+  // Show current week + any future date that has at least one probable pitcher listed
+  const previewDates = new Set(
+    Object.keys(byDate).filter(d =>
+      getWeekKey(d) !== thisWeek &&
+      d > thisWeek &&
+      byDate[d].some(g => g.away_pitcher || g.home_pitcher)
+    )
+  );
 
   let allGamesHtml = '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;font-size:0.78rem;color:#888">'
     + '<span><span style="color:#4a9eff;font-weight:700">●</span> 2 starts this week</span>'

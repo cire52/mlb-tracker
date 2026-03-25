@@ -1105,7 +1105,7 @@ def get_player_videos(player_id, season=None, limit=5):
 _probable_cache = {}
 PROBABLE_CACHE_TTL = 1800  # 30 min
 
-def get_probable_pitchers(days=14):
+def get_probable_pitchers(days=16):
     """Fetch probable pitchers for the next `days` days from the MLB schedule API."""
     now = time.time()
     if _probable_cache.get("data") and now - _probable_cache["ts"] < PROBABLE_CACHE_TTL:
