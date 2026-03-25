@@ -412,8 +412,7 @@
     <button class="hdr-btn" id="hubHotColdBtn" onclick="showHotCold()">🔥 Hot/Cold</button>
     <div class="hdr-divider"></div>
     <div class="hdr-sport-toggle">
-      <button class="hdr-sport-btn active" id="btnSpring" onclick="setSport('S')">🌵 Spring</button>
-      <button class="hdr-sport-btn" id="btnMLB" onclick="setSport('R')">⚾ MLB</button>
+      <button class="hdr-sport-btn active" id="btnMLB" onclick="setSport('R')">⚾ MLB</button>
     </div>
     <div class="hdr-divider"></div>
     <button class="hdr-btn" onclick="refreshData()" title="Refresh Data">↻</button>
@@ -471,8 +470,7 @@
         <button class="mob-footer-btn" id="mobHubHotColdBtn" onclick="showHotCold()">🔥 Hot/Cold</button>
       </div>
       <div class="mob-sport-row">
-        <button class="mob-sport-btn active" id="mobBtnSpring" onclick="setSport('S')">🌵 Spring</button>
-        <button class="mob-sport-btn" id="mobBtnMLB" onclick="setSport('R')">⚾ MLB</button>
+        <button class="mob-sport-btn active" id="mobBtnMLB" onclick="setSport('R')">⚾ MLB</button>
       </div>
       <div class="mob-action-row">
         <button class="mob-footer-btn" onclick="refreshData()">↻ Refresh</button>
@@ -507,7 +505,7 @@ function landingHtml() {
 
 let trackedPlayers = [];
 let activePlayerId = null;
-let currentSport = 'S';
+let currentSport = 'R';
 let currentHub = null;
 let activeTeam = localStorage.getItem('mlb_active_team') || '__all__';
 let userTeams = JSON.parse(localStorage.getItem('mlb_teams') || '["Main"]');
@@ -545,9 +543,7 @@ loadTracked();
 
 function setSport(sportId) {
   currentSport = sportId;
-  document.getElementById('btnSpring').classList.toggle('active', sportId === 'S');
   document.getElementById('btnMLB').classList.toggle('active', sportId === 'R');
-  document.getElementById('mobBtnSpring').classList.toggle('active', sportId === 'S');
   document.getElementById('mobBtnMLB').classList.toggle('active', sportId === 'R');
   if (compareIds.size >= 2) renderComparison();
   else if (currentHub === 'game') showGameHub();
