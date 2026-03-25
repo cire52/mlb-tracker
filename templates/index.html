@@ -2130,7 +2130,7 @@ async function showProbablePitchers() {
 
   let games;
   try {
-    const r = await fetch('/api/probable-pitchers?days=7');
+    const r = await fetch('/api/probable-pitchers?days=14');
     games = await r.json();
   } catch(e) {
     main.innerHTML = '<div class="hub-title">⚾ Probable Pitchers</div><div class="hub-empty">Failed to load probable pitchers.</div>';
@@ -2179,8 +2179,17 @@ async function showProbablePitchers() {
   const trackedIds = new Set(trackedPlayers.map(p => p.id));
 
   // Build 2-start pitcher list for current week only
-  function currentWeekKey() { return getWeekKey(new Date().toISOString().slice(0,10)); }
-  const thisWeek = currentWeekKey();
+  // On Sunday, show NEXT week (upcoming fantasy week); Mon-Sat show current week
+  function fantasyWeekKey() {
+    const today = new Date();
+    if (today.getDay() === 0) {
+      const nextMon = new Date(today);
+      nextMon.setDate(today.getDate() + 1);
+      return getWeekKey(nextMon.toISOString().slice(0,10));
+    }
+    return getWeekKey(today.toISOString().slice(0,10));
+  }
+  const thisWeek = fantasyWeekKey();
   const twoStartPitchers = [];
   const seen = new Set();
   for (const g of games) {
