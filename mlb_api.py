@@ -1374,11 +1374,16 @@ def get_hot_cold(days=14):
          lambda p: f".{int(_f(p['stat']['obp'])*1000):03d} OBP"),
         (sp("hitting","obp","desc"),        lambda p: p["stat"]["bbPct"] is not None and p["stat"]["bbPct"] >= 0.180 and p["stat"]["pa"] >= HIT_MIN_PA,
          lambda p: f"{int(p['stat']['bbPct']*100)}% BB%"),
-        (sp("hitting","avg","desc"),        lambda p: p["stat"]["kPct"] is not None and p["stat"]["kPct"] <= 0.100 and p["stat"]["pa"] >= HIT_MIN_PA_STRICT,
-         lambda p: f"{int(p['stat']['kPct']*100)}% K%"),
     ]
 
     hot_hit_seen = apply_criteria(hot_hit_criteria)
+    # K% is additive only — never the sole qualifier for hot hitters
+    for split in sp("hitting", "avg", "desc"):
+        p = fmt(split)
+        if p["id"] in hot_hit_seen and p["stat"]["kPct"] is not None and p["stat"]["kPct"] <= 0.100 and p["stat"]["pa"] >= HIT_MIN_PA_STRICT:
+            label = f"{int(p['stat']['kPct']*100)}% K%"
+            if label not in hot_hit_seen[p["id"]]["reasons"]:
+                hot_hit_seen[p["id"]]["reasons"].append(label)
     result["hot_hitters"] = sorted(
         hot_hit_seen.values(),
         key=lambda x: (-len(x["reasons"]), -x["stat"]["homeRuns"], -_f(x["stat"]["ops"]))
