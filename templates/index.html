@@ -2513,40 +2513,36 @@ async function showHotCold() {
 
   const tabStyle = (active) => `padding:9px 18px;background:none;border:none;border-bottom:2px solid ${active ? '#c8102e' : 'transparent'};color:${active ? '#fff' : '#666'};font-size:0.87rem;font-weight:600;cursor:pointer;margin-bottom:-1px`;
 
-  const hittersHtml = noData ? '' :
-    section('Hot Hitters', '#4caf7d', '🔥', data.hot_hitters, renderHitterRow, true) +
-    section('Cold Hitters', '#4a9eff', '🧊', data.cold_hitters, renderHitterRow, false);
-
-  const pitchersHtml = noData ? '' :
-    section('Hot Pitchers', '#4caf7d', '🔥', data.hot_pitchers, renderPitcherRow, true) +
-    section('Cold Pitchers', '#4a9eff', '🧊', data.cold_pitchers, renderPitcherRow, false);
-
   const emptyMsg = `<div class="hub-empty" style="padding-top:60px">No regular season data yet.<br><span style="font-size:0.8rem;color:#444">Check back when the regular season starts.</span></div>`;
+
+  const hotHitHtml  = noData ? emptyMsg : (section('Hot Hitters',  '#4caf7d', '🔥', data.hot_hitters,  renderHitterRow,  true)  || emptyMsg);
+  const coldHitHtml = noData ? emptyMsg : (section('Cold Hitters', '#4a9eff', '🧊', data.cold_hitters, renderHitterRow,  false) || emptyMsg);
+  const hotPitHtml  = noData ? emptyMsg : (section('Hot Pitchers',  '#4caf7d', '🔥', data.hot_pitchers,  renderPitcherRow, true)  || emptyMsg);
+  const coldPitHtml = noData ? emptyMsg : (section('Cold Pitchers', '#4a9eff', '🧊', data.cold_pitchers, renderPitcherRow, false) || emptyMsg);
 
   main.innerHTML = `
     <div class="hub-title">🔥 Hot/Cold Players <span style="font-size:0.75rem;font-weight:400;color:#555;margin-left:8px">Last 14 Days</span></div>
     <div style="display:flex;gap:0;border-bottom:1px solid #404862;margin-bottom:16px">
-      <button id="hcTabHitters" onclick="switchHCTab('hitters')" style="${tabStyle(true)}">Hitters</button>
-      <button id="hcTabPitchers" onclick="switchHCTab('pitchers')" style="${tabStyle(false)}">Pitchers</button>
+      <button id="hcTab0" onclick="switchHCTab(0)" style="${tabStyle(true)}">🔥 Hot Hitters</button>
+      <button id="hcTab1" onclick="switchHCTab(1)" style="${tabStyle(false)}">🧊 Cold Hitters</button>
+      <button id="hcTab2" onclick="switchHCTab(2)" style="${tabStyle(false)}">🔥 Hot Pitchers</button>
+      <button id="hcTab3" onclick="switchHCTab(3)" style="${tabStyle(false)}">🧊 Cold Pitchers</button>
     </div>
-    <div id="hcHittersPanel">${hittersHtml || emptyMsg}</div>
-    <div id="hcPitchersPanel" style="display:none">${pitchersHtml || emptyMsg}</div>`;
+    <div id="hcPanel0">${hotHitHtml}</div>
+    <div id="hcPanel1" style="display:none">${coldHitHtml}</div>
+    <div id="hcPanel2" style="display:none">${hotPitHtml}</div>
+    <div id="hcPanel3" style="display:none">${coldPitHtml}</div>`;
 }
 
-function switchHCTab(tab) {
-  const hp = document.getElementById('hcHittersPanel');
-  const pp = document.getElementById('hcPitchersPanel');
-  const th = document.getElementById('hcTabHitters');
-  const tp = document.getElementById('hcTabPitchers');
-  if (!hp) return;
-  if (tab === 'hitters') {
-    hp.style.display = ''; pp.style.display = 'none';
-    th.style.borderBottomColor = '#c8102e'; th.style.color = '#fff';
-    tp.style.borderBottomColor = 'transparent'; tp.style.color = '#666';
-  } else {
-    hp.style.display = 'none'; pp.style.display = '';
-    th.style.borderBottomColor = 'transparent'; th.style.color = '#666';
-    tp.style.borderBottomColor = '#c8102e'; tp.style.color = '#fff';
+function switchHCTab(idx) {
+  for (let i = 0; i < 4; i++) {
+    const panel = document.getElementById(`hcPanel${i}`);
+    const tab   = document.getElementById(`hcTab${i}`);
+    if (!panel) return;
+    const active = i === idx;
+    panel.style.display = active ? '' : 'none';
+    tab.style.borderBottomColor = active ? '#c8102e' : 'transparent';
+    tab.style.color = active ? '#fff' : '#666';
   }
 }
 
