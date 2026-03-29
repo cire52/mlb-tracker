@@ -1328,41 +1328,41 @@ def get_hot_cold(days=14):
                     seen[p["id"]] = p
         return seen
 
-    # Global minimums (14-day window)
-    HIT_MIN_PA  = 25   # plate appearances (ab + bb proxy)
-    HIT_MIN_PA_STRICT = 35  # for cold / small-sample checks
-    PIT_MIN_IP  = 7    # innings pitched for starters
-    PIT_MIN_IP_REL = 4  # relievers / closers
+    # Global minimums — low enough to qualify after 3 games
+    HIT_MIN_PA       = 8   # ~2 games worth of PA
+    HIT_MIN_PA_STRICT = 12  # ~3 games (cold list / rate checks)
+    PIT_MIN_IP       = 3   # 1 solid start or 3 relief appearances
+    PIT_MIN_IP_REL   = 1   # any pitcher with meaningful time
 
     # ─────────────────────────────────────────────
-    # HOT HITTERS — 15 criteria (14-day thresholds)
+    # HOT HITTERS — 15 criteria
     # ─────────────────────────────────────────────
     hot_hit_criteria = [
         # Power
-        (sp("hitting","homeRuns","desc"),   lambda p: p["stat"]["homeRuns"] >= 5 and p["stat"]["pa"] >= HIT_MIN_PA,
+        (sp("hitting","homeRuns","desc"),   lambda p: p["stat"]["homeRuns"] >= 2 and p["stat"]["pa"] >= HIT_MIN_PA,
          lambda p: f"{p['stat']['homeRuns']} HR"),
         (sp("hitting","slg","desc"),        lambda p: _f(p["stat"]["slg"]) >= 0.650 and p["stat"]["pa"] >= HIT_MIN_PA,
          lambda p: f".{int(_f(p['stat']['slg'])*1000):03d} SLG"),
         (sp("hitting","avg","desc"),        lambda p: p["stat"]["iso"] >= 0.280 and p["stat"]["pa"] >= HIT_MIN_PA,
          lambda p: f".{int(p['stat']['iso']*1000):03d} ISO"),
-        (sp("hitting","doubles","desc"),    lambda p: p["stat"]["doubles"] >= 5 and p["stat"]["pa"] >= HIT_MIN_PA,
+        (sp("hitting","doubles","desc"),    lambda p: p["stat"]["doubles"] >= 2 and p["stat"]["pa"] >= HIT_MIN_PA,
          lambda p: f"{p['stat']['doubles']} 2B"),
-        (sp("hitting","hits","desc"),       lambda p: p["stat"]["triples"] >= 2 and p["stat"]["pa"] >= HIT_MIN_PA,
+        (sp("hitting","hits","desc"),       lambda p: p["stat"]["triples"] >= 1 and p["stat"]["pa"] >= HIT_MIN_PA,
          lambda p: f"{p['stat']['triples']} 3B"),
         # Contact / Average
         (sp("hitting","avg","desc"),        lambda p: _f(p["stat"]["avg"]) >= 0.350 and p["stat"]["pa"] >= HIT_MIN_PA,
          lambda p: f".{int(_f(p['stat']['avg'])*1000):03d} AVG"),
-        (sp("hitting","hits","desc"),       lambda p: p["stat"]["hits"] >= 20 and p["stat"]["pa"] >= HIT_MIN_PA,
+        (sp("hitting","hits","desc"),       lambda p: p["stat"]["hits"] >= 7 and p["stat"]["pa"] >= HIT_MIN_PA,
          lambda p: f"{p['stat']['hits']} H"),
         # Production
-        (sp("hitting","rbi","desc"),        lambda p: p["stat"]["rbi"] >= 14 and p["stat"]["pa"] >= HIT_MIN_PA,
+        (sp("hitting","rbi","desc"),        lambda p: p["stat"]["rbi"] >= 5 and p["stat"]["pa"] >= HIT_MIN_PA,
          lambda p: f"{p['stat']['rbi']} RBI"),
-        (sp("hitting","runs","desc"),       lambda p: p["stat"]["runs"] >= 10 and p["stat"]["pa"] >= HIT_MIN_PA,
+        (sp("hitting","runs","desc"),       lambda p: p["stat"]["runs"] >= 4 and p["stat"]["pa"] >= HIT_MIN_PA,
          lambda p: f"{p['stat']['runs']} R"),
-        (sp("hitting","hits","desc"),       lambda p: p["stat"]["xbh"] >= 8 and p["stat"]["pa"] >= HIT_MIN_PA,
+        (sp("hitting","hits","desc"),       lambda p: p["stat"]["xbh"] >= 3 and p["stat"]["pa"] >= HIT_MIN_PA,
          lambda p: f"{p['stat']['xbh']} XBH"),
         # Speed
-        (sp("hitting","stolenBases","desc"),lambda p: p["stat"]["stolenBases"] >= 5 and p["stat"]["pa"] >= HIT_MIN_PA,
+        (sp("hitting","stolenBases","desc"),lambda p: p["stat"]["stolenBases"] >= 2 and p["stat"]["pa"] >= HIT_MIN_PA,
          lambda p: f"{p['stat']['stolenBases']} SB"),
         # Advanced / On-base
         (sp("hitting","ops","desc"),        lambda p: _f(p["stat"]["ops"]) >= 0.950 and p["stat"]["pa"] >= HIT_MIN_PA,
@@ -1382,18 +1382,18 @@ def get_hot_cold(days=14):
     )
 
     # ─────────────────────────────────────────────
-    # COLD HITTERS — 9 criteria (14-day thresholds)
+    # COLD HITTERS — 9 criteria
     # ─────────────────────────────────────────────
     cold_hit_criteria = [
         (sp("hitting","avg","asc"),         lambda p: _f(p["stat"]["avg"],1) < 0.180 and p["stat"]["pa"] >= HIT_MIN_PA_STRICT,
          lambda p: f".{int(_f(p['stat']['avg'])*1000):03d} AVG"),
-        (sp("hitting","strikeOuts","desc"), lambda p: p["stat"]["strikeOuts"] >= 20 and p["stat"]["pa"] >= HIT_MIN_PA_STRICT,
+        (sp("hitting","strikeOuts","desc"), lambda p: p["stat"]["strikeOuts"] >= 8 and p["stat"]["pa"] >= HIT_MIN_PA_STRICT,
          lambda p: f"{p['stat']['strikeOuts']} K"),
         (sp("hitting","ops","asc"),         lambda p: _f(p["stat"]["ops"],1) < 0.500 and p["stat"]["pa"] >= HIT_MIN_PA_STRICT,
          lambda p: f"{_f(p['stat']['ops']):.3f} OPS"),
         (sp("hitting","avg","asc"),         lambda p: _f(p["stat"]["slg"],1) < 0.250 and p["stat"]["pa"] >= HIT_MIN_PA_STRICT,
          lambda p: f".{int(_f(p['stat']['slg'])*1000):03d} SLG"),
-        (sp("hitting","avg","asc"),         lambda p: p["stat"]["xbh"] <= 1 and p["stat"]["pa"] >= HIT_MIN_PA_STRICT,
+        (sp("hitting","avg","asc"),         lambda p: p["stat"]["xbh"] == 0 and p["stat"]["pa"] >= HIT_MIN_PA_STRICT,
          lambda p: "0 XBH"),
         (sp("hitting","obp","asc"),         lambda p: _f(p["stat"]["obp"],1) < 0.220 and p["stat"]["pa"] >= HIT_MIN_PA_STRICT,
          lambda p: f".{int(_f(p['stat']['obp'])*1000):03d} OBP"),
@@ -1401,7 +1401,7 @@ def get_hot_cold(days=14):
          lambda p: "0 Power"),
         (sp("hitting","strikeOuts","desc"), lambda p: p["stat"]["kPct"] is not None and p["stat"]["kPct"] >= 0.350 and p["stat"]["pa"] >= HIT_MIN_PA_STRICT,
          lambda p: f"{int(p['stat']['kPct']*100)}% K%"),
-        (sp("hitting","avg","asc"),         lambda p: p["stat"]["baseOnBalls"] <= 1 and p["stat"]["pa"] >= 40,
+        (sp("hitting","avg","asc"),         lambda p: p["stat"]["baseOnBalls"] == 0 and p["stat"]["pa"] >= 15,
          lambda p: "0 BB"),
     ]
 
@@ -1412,7 +1412,7 @@ def get_hot_cold(days=14):
     )[:35]
 
     # ─────────────────────────────────────────────
-    # HOT PITCHERS — 12 criteria (14-day thresholds)
+    # HOT PITCHERS — 12 criteria
     # ─────────────────────────────────────────────
     def ipv(p):
         return p["stat"]["ipTrue"]
@@ -1433,7 +1433,7 @@ def get_hot_cold(days=14):
         (sp("pitching","whip","asc"),       lambda p: p["stat"]["homeRunsAllowed"] == 0 and ipv(p) >= PIT_MIN_IP,
          lambda p: "0 HR allowed"),
         # Strikeouts
-        (sp("pitching","strikeOuts","desc"),lambda p: p["stat"]["pitcherStrikeOuts"] >= 18 and ipv(p) >= PIT_MIN_IP_REL,
+        (sp("pitching","strikeOuts","desc"),lambda p: p["stat"]["pitcherStrikeOuts"] >= 6 and ipv(p) >= PIT_MIN_IP_REL,
          lambda p: f"{p['stat']['pitcherStrikeOuts']} K"),
         (sp("pitching","strikeOuts","desc"),lambda p: p["stat"]["k9"] is not None and p["stat"]["k9"] >= 12.0 and ipv(p) >= PIT_MIN_IP,
          lambda p: f"{p['stat']['k9']:.1f} K/9"),
@@ -1443,9 +1443,9 @@ def get_hot_cold(days=14):
         (sp("pitching","whip","asc"),       lambda p: p["stat"]["bb9"] is not None and p["stat"]["bb9"] <= 1.5 and ipv(p) >= PIT_MIN_IP,
          lambda p: f"{p['stat']['bb9']:.1f} BB/9"),
         # Saves
-        (sp("pitching","saves","desc"),     lambda p: p["stat"]["saves"] >= 3 and ipv(p) >= PIT_MIN_IP_REL,
+        (sp("pitching","saves","desc"),     lambda p: p["stat"]["saves"] >= 1 and ipv(p) >= PIT_MIN_IP_REL,
          lambda p: f"{p['stat']['saves']} SV"),
-        (sp("pitching","saves","desc"),     lambda p: p["stat"]["saves"] >= 2 and _f(p["stat"]["era"],99) == 0 and ipv(p) >= PIT_MIN_IP_REL,
+        (sp("pitching","saves","desc"),     lambda p: p["stat"]["saves"] >= 1 and _f(p["stat"]["era"],99) == 0 and ipv(p) >= PIT_MIN_IP_REL,
          lambda p: "Perfect closer"),
     ]
 
@@ -1456,20 +1456,20 @@ def get_hot_cold(days=14):
     )
 
     # ─────────────────────────────────────────────
-    # COLD PITCHERS — 10 criteria (14-day thresholds)
+    # COLD PITCHERS — 10 criteria
     # ─────────────────────────────────────────────
     cold_pit_criteria = [
         (sp("pitching","era","desc"),         lambda p: _f(p["stat"]["era"]) >= 6.00 and ipv(p) >= PIT_MIN_IP,
          lambda p: f"{_f(p['stat']['era']):.2f} ERA"),
         (sp("pitching","whip","desc"),        lambda p: _f(p["stat"]["whip"]) >= 1.90 and ipv(p) >= PIT_MIN_IP,
          lambda p: f"{_f(p['stat']['whip']):.2f} WHIP"),
-        (sp("pitching","baseOnBalls","desc"), lambda p: p["stat"]["walks"] >= 10 and ipv(p) >= PIT_MIN_IP_REL,
+        (sp("pitching","baseOnBalls","desc"), lambda p: p["stat"]["walks"] >= 4 and ipv(p) >= PIT_MIN_IP_REL,
          lambda p: f"{p['stat']['walks']} BB"),
-        (sp("pitching","hits","desc"),        lambda p: p["stat"]["hitsAllowed"] >= 25 and ipv(p) >= PIT_MIN_IP,
+        (sp("pitching","hits","desc"),        lambda p: p["stat"]["hitsAllowed"] >= 8 and ipv(p) >= PIT_MIN_IP,
          lambda p: f"{p['stat']['hitsAllowed']} H allowed"),
-        (sp("pitching","homeRuns","desc"),    lambda p: p["stat"]["homeRunsAllowed"] >= 4 and ipv(p) >= PIT_MIN_IP,
+        (sp("pitching","homeRuns","desc"),    lambda p: p["stat"]["homeRunsAllowed"] >= 2 and ipv(p) >= PIT_MIN_IP,
          lambda p: f"{p['stat']['homeRunsAllowed']} HR allowed"),
-        (sp("pitching","era","desc"),         lambda p: p["stat"]["blownSaves"] >= 2 and ipv(p) >= PIT_MIN_IP_REL,
+        (sp("pitching","era","desc"),         lambda p: p["stat"]["blownSaves"] >= 1 and ipv(p) >= PIT_MIN_IP_REL,
          lambda p: f"{p['stat']['blownSaves']} BS"),
         (sp("pitching","era","desc"),         lambda p: p["stat"]["hr9"] is not None and p["stat"]["hr9"] >= 2.0 and ipv(p) >= PIT_MIN_IP,
          lambda p: f"{p['stat']['hr9']:.1f} HR/9"),
