@@ -1159,7 +1159,7 @@ def get_probable_pitchers(days=16):
     return games
 
 
-_hot_cold_cache = {}
+_hot_cold_cache: dict = {}
 HOT_COLD_CACHE_TTL = 1800  # 30 min
 
 
@@ -1172,13 +1172,16 @@ def get_hot_cold(days=14):
     season = datetime.date.today().year
     result = {"hot_hitters": [], "cold_hitters": [], "hot_pitchers": [], "cold_pitchers": [], "days": days}
 
+    start_date = (datetime.date.today() - datetime.timedelta(days=days)).strftime("%m/%d/%Y")
+    end_date   = datetime.date.today().strftime("%m/%d/%Y")
+
     def fetch(group, sort_stat, order, limit=250):
         try:
             r = requests.get(f"{BASE}/stats", params={
-                "stats": "lastXDays",
-                "lastXDays": days,
+                "stats": "byDateRange",
+                "startDate": start_date,
+                "endDate": end_date,
                 "group": group,
-                "gameType": "R",
                 "playerPool": "All",
                 "limit": limit,
                 "sortStat": sort_stat,
